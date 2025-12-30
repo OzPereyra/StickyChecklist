@@ -342,7 +342,9 @@
 
                 card.innerHTML = `
                     <div class="note-checkbox-container">
-                        <input type="checkbox" class="note-checkbox" value="${note.id}" onchange="toggleNoteSelection('${note.id}', this.checked)">
+                        <input type="checkbox" class="note-checkbox" value="${note.id}" 
+                            ${note.isOpen ? 'disabled title="No se puede eliminar una nota abierta"' : ''}
+                            onchange="toggleNoteSelection('${note.id}', this.checked)">
                     </div>
                     <div class="note-info">
                         <div class="note-title" title="${note.title || 'Sin título'}">${note.title || 'Sin título'}</div>
@@ -353,7 +355,7 @@
                     </div>
                     <div class="actions">
                         <button class="btn-open" onclick="reopenNote('${note.id}')">${note.isOpen ? 'Traer al Frente' : 'Reabrir'}</button>
-                        <button class="btn-delete" onclick="deleteNote('${note.id}')">Eliminar</button>
+                        ${note.isOpen ? '' : `<button class="btn-delete" onclick="deleteNote('${note.id}')">Eliminar</button>`}
                     </div>
                 `;
                 listContainer.appendChild(card);
@@ -372,7 +374,7 @@
 
         function toggleSelectAll() {
             const isChecked = document.getElementById('select-all-checkbox').checked;
-            const checkboxes = document.querySelectorAll('.note-checkbox');
+            const checkboxes = document.querySelectorAll('.note-checkbox:not(:disabled)');
 
             selectedNotes.clear();
             checkboxes.forEach(cb => {
