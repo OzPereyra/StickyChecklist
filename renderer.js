@@ -511,7 +511,10 @@ document.querySelector('.note-header').addEventListener('dblclick', (e) => {
 });
 
 btnAdd.addEventListener('click', () => {
-    ipcRenderer.send('create-new-note', noteId);
+    ipcRenderer.send('create-new-note', {
+        fromNoteId: noteId,
+        fontSettings: noteData.fontSettings
+    });
 });
 
 btnClose.addEventListener('click', () => {

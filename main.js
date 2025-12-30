@@ -26,7 +26,10 @@ function createNoteWindow(noteId, options = {}) {
             italic: false,
             underline: false
         },
-        appearance: storage.getGlobalSettings().appearance
+        appearance: {
+            ...storage.getGlobalSettings().appearance,
+            lengthMultiplier: 1
+        }
     };
 
     const allNotes = storage.getAllNotes();
@@ -209,7 +212,8 @@ function notifyManagerRefresh() {
     }
 }
 
-ipcMain.on('create-new-note', (event, fromNoteId) => {
+ipcMain.on('create-new-note', (event, options) => {
+    const { fromNoteId, fontSettings } = options || {};
     let x, y;
     if (fromNoteId && windows[fromNoteId]) {
         const bounds = windows[fromNoteId].getBounds();
@@ -220,7 +224,12 @@ ipcMain.on('create-new-note', (event, fromNoteId) => {
     const colors = ['theme-yellow', 'theme-blue', 'theme-pink', 'theme-green'];
     const randomColor = colors[Math.floor(Math.random() * colors.length)];
 
-    createNoteWindow(crypto.randomUUID(), { x, y, color: randomColor });
+    createNoteWindow(crypto.randomUUID(), {
+        x,
+        y,
+        color: randomColor,
+        fontSettings: fontSettings || undefined
+    });
     notifyManagerRefresh();
 });
 
@@ -467,15 +476,16 @@ ipcMain.on('show-settings-menu', (event, { noteId, fontSettings, currentColor, a
         { label: 'x2 Largo', value: 2 },
         { label: 'x3 Largo', value: 3 }
     ].forEach(l => {
+        const isMarked = parseInt(appearance.lengthMultiplier || 1) === l.value;
         lengthSubmenu.append(new MenuItem({
             label: l.label,
-            type: 'radio',
-            checked: parseInt(appearance.lengthMultiplier || 1) === l.value,
+            type: 'checkbox',
+            checked: isMarked,
             click: () => {
                 const newL = parseInt(l.value);
                 win.webContents.send('appearance-changed', { key: 'lengthMultiplier', value: newL });
 
-                // Update local copy so menu reflect change if reopened
+                // Update local copy so menu reflects change if reopened
                 appearance.lengthMultiplier = newL;
 
                 // Immediate resize

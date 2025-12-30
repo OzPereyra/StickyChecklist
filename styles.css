@@ -95,6 +95,7 @@ html {
     font-size: 1.1rem;
     /* 1pt bigger than content usually approx 1.1rem vs 1rem */
     color: var(--title-color, #333);
+    opacity: 0.8;
     width: 100%;
     text-overflow: ellipsis;
 }
@@ -178,7 +179,8 @@ textarea {
     resize: none;
     outline: none;
     font-size: 1rem;
-    color: #333;
+    color: var(--title-color, #333);
+    opacity: 0.9;
     font-family: inherit;
     line-height: 1.5;
     flex-grow: 1;
@@ -201,7 +203,8 @@ textarea {
     align-items: center;
     gap: 8px;
     font-size: 1rem;
-    color: #333;
+    color: var(--title-color, #333);
+    opacity: 0.9;
     animation: fadeIn 0.2s ease;
 }
 
@@ -271,26 +274,26 @@ textarea {
     --bg-color-flat: #FFF59D;
     --bg-color-light: #FFF9C4;
     --bg-color-dark: #FFF176;
-    --title-color: #2a2815;
+    --title-color: #4e4a2e;
 }
 
 .theme-blue {
     --bg-color-flat: #BBDEFB;
     --bg-color-light: #E3F2FD;
     --bg-color-dark: #90CAF9;
-    --title-color: #151a2a;
+    --title-color: #2e354e;
 }
 
 .theme-pink {
     --bg-color-flat: #F8BBD0;
     --bg-color-light: #FCE4EC;
     --bg-color-dark: #F48FB1;
-    --title-color: #2a151f;
+    --title-color: #4e2e3a;
 }
 
 .theme-green {
     --bg-color-flat: #C8E6C9;
     --bg-color-light: #E8F5E9;
     --bg-color-dark: #A5D6A7;
-    --title-color: #152a17;
+    --title-color: #2e4e31;
 }
