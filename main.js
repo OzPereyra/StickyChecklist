@@ -466,32 +466,35 @@ ipcMain.handle('get-global-settings', () => {
 });
 
 ipcMain.on('update-global-settings', (event, settings) => {
+    const oldSettings = storage.getGlobalSettings();
     storage.saveGlobalSettings(settings);
+
+    // Identify if size-affecting settings changed
+    const sizeChanged = (oldSettings.appearance.scale !== settings.appearance.scale) ||
+        (oldSettings.appearance.lengthMultiplier !== settings.appearance.lengthMultiplier);
 
     // Broadcast to all windows
     Object.values(windows).forEach(win => {
         if (win.isDestroyed()) return;
+
+        // Send the settings to update transparency/radius/style via CSS
         win.webContents.send('global-settings-changed', settings);
 
-        // Calculate new size
-        const baseWidth = 320;
-        const baseHeightBase = 350;
-        const scale = settings.appearance.scale || 1.0;
-        const multiplier = settings.appearance.lengthMultiplier || 1;
+        // ONLY update window size if the scale or length multiplier changed
+        if (sizeChanged) {
+            const baseWidth = 320;
+            const baseHeightBase = 350;
+            const scale = settings.appearance.scale || 1.0;
+            const multiplier = settings.appearance.lengthMultiplier || 1;
 
-        const finalWidth = Math.round(baseWidth * scale);
-        const finalHeight = Math.round(baseHeightBase * multiplier * scale);
+            const finalWidth = Math.round(baseWidth * scale);
+            const finalHeight = Math.round(baseHeightBase * multiplier * scale);
 
-        const currentSize = win.getSize();
-        // Only update bounds if size actually changed to prevent jumping/jitter
-        if (currentSize[0] !== finalWidth || currentSize[1] !== finalHeight) {
-            const bounds = win.getBounds();
-            win.setBounds({
-                x: bounds.x,
-                y: bounds.y,
-                width: finalWidth,
-                height: finalHeight
-            }, false);
+            const currentSize = win.getSize();
+            if (currentSize[0] !== finalWidth || currentSize[1] !== finalHeight) {
+                // Use setSize to keep the top-left anchored without shifting the window
+                win.setSize(finalWidth, finalHeight);
+            }
         }
     });
 });
