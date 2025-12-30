@@ -257,6 +257,16 @@ ipcMain.on('delete-note-permanent', (event, noteId) => {
     storage.deleteNote(noteId);
 });
 
+ipcMain.on('delete-notes-bulk', (event, noteIds) => {
+    if (!Array.isArray(noteIds)) return;
+    noteIds.forEach(noteId => {
+        if (windows[noteId]) {
+            windows[noteId].close();
+        }
+        storage.deleteNote(noteId);
+    });
+});
+
 ipcMain.on('update-note-data', (event, data) => {
     const allNotes = storage.getAllNotes();
     if (allNotes[data.id]) {
