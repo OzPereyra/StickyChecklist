@@ -480,3 +480,11 @@ setTimeout(() => {
     save();
     lastSavedContent = noteData.content;
 }, 1000);
+// Context Menu
+window.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    ipcRenderer.send('show-context-menu', {
+        noteId,
+        fontSettings: noteData.fontSettings
+    });
+});

@@ -552,6 +552,42 @@ ipcMain.on('show-settings-menu', (event, { noteId, fontSettings, currentColor, a
     menu.popup({ window: win });
 });
 
+ipcMain.on('show-context-menu', (event, { noteId, fontSettings }) => {
+    const { Menu, MenuItem } = require('electron');
+    const win = windows[noteId] || BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+
+    const menu = new Menu();
+
+    // --- COPIAR Y PEGAR ---
+    menu.append(new MenuItem({ label: 'Copiar', role: 'copy' }));
+    menu.append(new MenuItem({ label: 'Pegar', role: 'paste' }));
+
+    menu.append(new MenuItem({ type: 'separator' }));
+
+    // --- ESTILO ---
+    menu.append(new MenuItem({
+        label: 'Negrita',
+        type: 'checkbox',
+        checked: fontSettings.bold,
+        click: (item) => win.webContents.send('settings-changed', { key: 'bold', value: item.checked })
+    }));
+    menu.append(new MenuItem({
+        label: 'Cursiva',
+        type: 'checkbox',
+        checked: fontSettings.italic,
+        click: (item) => win.webContents.send('settings-changed', { key: 'italic', value: item.checked })
+    }));
+    menu.append(new MenuItem({
+        label: 'Subrayado',
+        type: 'checkbox',
+        checked: fontSettings.underline,
+        click: (item) => win.webContents.send('settings-changed', { key: 'underline', value: item.checked })
+    }));
+
+    menu.popup({ window: win });
+});
+
 // Manager IPCs
 ipcMain.handle('get-all-notes-data', () => {
     const allNotes = storage.getAllNotes();
