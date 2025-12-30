@@ -1,12 +1,18 @@
 const fs = require('fs');
 const path = require('path');
-const { app } = require('electron');
 
 class StorageManager {
     constructor() {
-        // Default path: Documents/StickyChecklist
-        this.baseDir = path.join(app.getPath('documents'), 'StickyChecklist');
-        this.ensureDirectoryExists(this.baseDir);
+        this.baseDir = null;
+    }
+
+    _getBaseDir() {
+        if (!this.baseDir) {
+            const { app } = require('electron');
+            this.baseDir = path.join(app.getPath('documents'), 'StickyChecklist');
+            this.ensureDirectoryExists(this.baseDir);
+        }
+        return this.baseDir;
     }
 
     ensureDirectoryExists(dirPath) {
@@ -15,7 +21,6 @@ class StorageManager {
                 fs.mkdirSync(dirPath, { recursive: true });
             } catch (error) {
                 console.error('Failed to create directory:', error);
-                // Fallback to userdata if permission denied?
             }
         }
     }
@@ -23,26 +28,26 @@ class StorageManager {
     setDirectory(newPath) {
         if (newPath && fs.existsSync(newPath)) {
             this.baseDir = newPath;
-            // Optionally migrate files? For now, we just switch pointer.
             return true;
         }
         return false;
     }
 
     getDirectory() {
-        return this.baseDir;
+        return this._getBaseDir();
     }
 
     // Get all notes as object { id: data }
     getAllNotes() {
         const notes = {};
-        if (!fs.existsSync(this.baseDir)) return notes;
+        const base = this._getBaseDir();
+        if (!fs.existsSync(base)) return notes;
 
-        const files = fs.readdirSync(this.baseDir);
+        const files = fs.readdirSync(base);
         files.forEach(file => {
             if (path.extname(file) === '.json') {
                 try {
-                    const filePath = path.join(this.baseDir, file);
+                    const filePath = path.join(base, file);
                     const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
                     if (data.id) {
                         notes[data.id] = data;
@@ -57,8 +62,27 @@ class StorageManager {
 
     saveNote(noteData) {
         if (!noteData.id) return;
-        this.ensureDirectoryExists(this.baseDir);
-        const filePath = path.join(this.baseDir, `${noteData.id}.json`);
+        const base = this._getBaseDir();
+        this.ensureDirectoryExists(base);
+
+        // Clean title for filename
+        const safeTitle = (noteData.title || 'Sin Titulo')
+            .replace(/[<>:"/\\|?*]/g, '') // Remove invalid chars
+            .substring(0, 50)             // Limit length
+            .trim();
+
+        // Filename format: SafeTitle_id.json
+        const filename = `${safeTitle}_${noteData.id}.json`;
+        const filePath = path.join(base, filename);
+
+        // Check if there's an existing file with a different name for this ID and delete it (Rename simulation)
+        const oldFiles = fs.readdirSync(base);
+        for (const file of oldFiles) {
+            if (file.endsWith(`${noteData.id}.json`) && file !== filename) {
+                try { fs.unlinkSync(path.join(base, file)); } catch (e) { }
+            }
+        }
+
         try {
             fs.writeFileSync(filePath, JSON.stringify(noteData, null, 2), 'utf8');
         } catch (err) {
@@ -67,12 +91,16 @@ class StorageManager {
     }
 
     deleteNote(noteId) {
-        const filePath = path.join(this.baseDir, `${noteId}.json`);
-        if (fs.existsSync(filePath)) {
-            try {
-                fs.unlinkSync(filePath);
-            } catch (err) {
-                console.error('Error deleting note:', err);
+        const base = this._getBaseDir();
+        if (!fs.existsSync(base)) return;
+        const files = fs.readdirSync(base);
+        for (const file of files) {
+            if (file.endsWith(`${noteId}.json`)) {
+                try {
+                    fs.unlinkSync(path.join(base, file));
+                } catch (err) {
+                    console.error('Error deleting note:', err);
+                }
             }
         }
     }

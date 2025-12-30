@@ -198,6 +198,7 @@ function renderChecklist(contentString) {
         input.style.fontWeight = s.bold ? '700' : '400';
         input.style.fontStyle = s.italic ? 'italic' : 'normal';
         input.style.textDecoration = s.underline ? 'underline' : 'none';
+
         if (item.checked) {
             input.style.textDecoration = 'line-through';
             if (s.underline) input.style.textDecoration += ' underline';
@@ -205,15 +206,14 @@ function renderChecklist(contentString) {
 
         input.addEventListener('input', () => {
             items[index].text = input.value;
-            // Debounce logic could go here, but frequent small saves are okay for local file
-            updateContentFromChecklist(items);
         });
+        attachChecklistSaveListener(input, items);
 
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 items.splice(index + 1, 0, { text: '', checked: false });
-                updateContentFromChecklist(items);
+                updateContentFromChecklist(items); // Instant save on Enter
                 renderChecklist(checklistToText(items));
                 setTimeout(() => {
                     const inputs = checklistContainer.querySelectorAll('input[type="text"]');
@@ -340,7 +340,8 @@ btnSettings.addEventListener('click', (e) => {
     // Send current state to main to populate menu
     ipcRenderer.send('show-settings-menu', {
         noteId,
-        fontSettings: noteData.fontSettings
+        fontSettings: noteData.fontSettings,
+        currentColor: noteData.color
     });
 });
 
@@ -348,6 +349,17 @@ btnSettings.addEventListener('click', (e) => {
 // Listen for updates from Native Menu
 ipcRenderer.on('settings-changed', (event, { key, value }) => {
     updateFontSettings(key, value);
+});
+
+ipcRenderer.on('color-changed', (event, newColor) => {
+    noteContainer.classList.remove(...colors);
+    noteContainer.classList.add(newColor);
+    noteData.color = newColor;
+    save();
+});
+
+ipcRenderer.on('force-save', () => {
+    save();
 });
 
 ipcRenderer.on('storage-changed', (event, newPath) => {
@@ -368,19 +380,58 @@ function updateFontSettings(key, value) {
 // For now, these listeners will just fail silently or simply likely not fire since elements might be hidden/removed.
 // I will just remove the explicit listeners for the HTML elements.
 
-// Event Listeners (Existing)
+// --- Smarter Save Logic ---
+let lastSavedContent = '';
+
+function shouldTriggerSave(current) {
+    if (current === lastSavedContent) return false;
+    if (current.length === 0) return true;
+
+    const lastChar = current.slice(-1);
+
+    // Condition: Enter / New Line
+    if (lastChar === '\n') return true;
+
+    // Condition: Two spaces
+    if (current.endsWith('  ')) return true;
+
+    // Condition: Special characters or punctuation
+    if (/[.,!?;:()=+-]/.test(lastChar)) return true;
+
+    // Condition: Space after word, save every 2 words approximately
+    if (lastChar === ' ') {
+        const wordsCount = current.trim().split(/\s+/).length;
+        if (wordsCount % 2 === 0) return true;
+    }
+
+    return false;
+}
+
+// Event Listeners (Refined)
 textarea.addEventListener('input', () => {
-    noteData.content = textarea.value;
-    save();
+    const content = textarea.value;
+    if (shouldTriggerSave(content)) {
+        noteData.content = content;
+        save();
+        lastSavedContent = content;
+    }
 });
 
-// Color Change (Double click on drag handle) -> User asked to drag using button. 
-// Color change was convenience. Let's keep it on the handle button? 
-// Or general header? Header is no longer a drag region. 
-// New drag handle is `#btn-drag`.
-// Let's attach double click to the general header background?
+// For Checklist, we apply similar logic to each input
+function attachChecklistSaveListener(input, items) {
+    input.addEventListener('input', () => {
+        const content = input.value;
+        if (shouldTriggerSave(content)) {
+            updateContentFromChecklist(items);
+            lastSavedContent = content; // Approximate
+        }
+    });
+}
+
+// (We need to update renderChecklist to use this helper)
+
+// Color Change (Double click on drag handle)
 document.querySelector('.note-header').addEventListener('dblclick', (e) => {
-    // Avoid double clicking buttons triggers color change
     if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
         const currentColor = noteData.color;
         let nextIndex = (colors.indexOf(currentColor) + 1) % colors.length;
@@ -411,3 +462,9 @@ function save() {
         fontSettings: noteData.fontSettings
     });
 }
+
+// Trigger initial save on load as requested
+setTimeout(() => {
+    save();
+    lastSavedContent = noteData.content;
+}, 1000);

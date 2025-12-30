@@ -16,6 +16,7 @@ function createNoteWindow(noteId, options = {}) {
         content: '',
         title: 'Sticky Checklist',
         type: 'text',
+        isOpen: true,
         fontSettings: {
             family: "'Outfit', sans-serif",
             size: 16,
@@ -28,16 +29,17 @@ function createNoteWindow(noteId, options = {}) {
     const allNotes = storage.getAllNotes();
     const noteData = allNotes[noteId] || { ...defaults, id: noteId, ...options };
 
+    // Ensure isOpen is true when we are creating the window
+    noteData.isOpen = true;
+
     // Merge defaults
     if (allNotes[noteId]) {
         noteData.fontSettings = { ...defaults.fontSettings, ...(noteData.fontSettings || {}) };
         if (!noteData.title) noteData.title = defaults.title;
     }
 
-    // Save initial state if it's new
-    if (!allNotes[noteId]) {
-        storage.saveNote(noteData);
-    }
+    // Save state
+    storage.saveNote(noteData);
 
     const win = new BrowserWindow({
         width: noteData.width || 320,
@@ -91,8 +93,6 @@ if (!gotTheLock) {
     app.quit();
 } else {
     app.on('second-instance', (event, commandLine, workingDirectory) => {
-        // Someone tried to run a second instance, we should focus our windows.
-        // Maybe focus the last active one?
         const winIds = Object.keys(windows);
         if (winIds.length > 0) {
             const win = windows[winIds[0]];
@@ -111,19 +111,30 @@ if (!gotTheLock) {
         });
 
         const notes = storage.getAllNotes();
-        const noteIds = Object.keys(notes);
+        const openNotes = Object.values(notes).filter(n => n.isOpen);
 
-        if (noteIds.length === 0) {
-            createNoteWindow(crypto.randomUUID());
+        if (openNotes.length === 0) {
+            if (Object.keys(notes).length === 0) {
+                // Fresh start: no notes at all
+                createNoteWindow(crypto.randomUUID());
+            } else {
+                // Notes exist but all are closed: open Manager
+                openNoteManager();
+            }
         } else {
-            noteIds.forEach(id => createNoteWindow(id));
+            openNotes.forEach(n => createNoteWindow(n.id));
         }
 
         app.on('activate', () => {
             if (BrowserWindow.getAllWindows().length === 0) {
                 const notes = storage.getAllNotes();
-                if (Object.keys(notes).length === 0) {
-                    createNoteWindow(crypto.randomUUID());
+                const openNotes = Object.values(notes).filter(n => n.isOpen);
+                if (openNotes.length === 0) {
+                    if (Object.keys(notes).length === 0) {
+                        createNoteWindow(crypto.randomUUID());
+                    } else {
+                        openNoteManager();
+                    }
                 }
             }
         });
@@ -138,6 +149,15 @@ app.on('window-all-closed', () => {
 
 // --- IPC Handlers ---
 
+// Note Manager Window
+let managerWin = null;
+
+function notifyManagerRefresh() {
+    if (managerWin) {
+        managerWin.webContents.send('refresh-manager');
+    }
+}
+
 ipcMain.on('create-new-note', (event, fromNoteId) => {
     let x, y;
     if (fromNoteId && windows[fromNoteId]) {
@@ -147,23 +167,33 @@ ipcMain.on('create-new-note', (event, fromNoteId) => {
     }
 
     const colors = ['theme-yellow', 'theme-blue', 'theme-pink', 'theme-green'];
-    let availableColors = colors;
-    const randomColor = availableColors[Math.floor(Math.random() * availableColors.length)];
+    const randomColor = colors[Math.floor(Math.random() * colors.length)];
 
     createNoteWindow(crypto.randomUUID(), { x, y, color: randomColor });
+    notifyManagerRefresh();
 });
 
 ipcMain.on('delete-note', (event, noteId) => {
-    // Try to find window by ID, or fallback to event.sender
     let win = windows[noteId];
-    if (!win) {
-        win = BrowserWindow.fromWebContents(event.sender);
-    }
+    if (!win) win = BrowserWindow.fromWebContents(event.sender);
 
     if (win) {
         win.close();
     }
-    // Ensure persistence removal
+
+    const allNotes = storage.getAllNotes();
+    if (allNotes[noteId]) {
+        allNotes[noteId].isOpen = false;
+        storage.saveNote(allNotes[noteId]);
+    }
+    notifyManagerRefresh();
+});
+
+ipcMain.on('delete-note-permanent', (event, noteId) => {
+    // This will be called from the Note Manager
+    if (windows[noteId]) {
+        windows[noteId].close();
+    }
     storage.deleteNote(noteId);
 });
 
@@ -175,38 +205,72 @@ ipcMain.on('update-note-data', (event, data) => {
     }
 });
 
-ipcMain.on('show-settings-menu', (event, { noteId, fontSettings }) => {
+function openNoteManager() {
+    if (managerWin) {
+        managerWin.focus();
+        return;
+    }
+
+    managerWin = new BrowserWindow({
+        width: 700,
+        height: 600,
+        title: 'Administrador de Notas',
+        frame: false,
+        transparent: true,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false
+        }
+    });
+
+    managerWin.setMenu(null);
+    managerWin.loadFile('manager.html');
+    managerWin.on('closed', () => { managerWin = null; });
+}
+
+ipcMain.on('open-manager', () => {
+    openNoteManager();
+});
+
+ipcMain.on('manager-close', () => {
+    if (managerWin) managerWin.close();
+});
+
+ipcMain.on('manager-minimize', () => {
+    if (managerWin) managerWin.minimize();
+});
+
+ipcMain.on('show-settings-menu', (event, { noteId, fontSettings, currentColor }) => {
     const { Menu, MenuItem } = require('electron');
     const win = windows[noteId] || BrowserWindow.fromWebContents(event.sender);
     if (!win) return;
 
-    const fontFamilies = [
+    const menu = new Menu();
+
+    // --- FUENTE SUBMENU ---
+    const fontMainSubmenu = new Menu();
+
+    // Submenu: Tipo de Fuente
+    const familyMenu = new Menu();
+    [
         { label: 'Outfit', value: "'Outfit', sans-serif" },
         { label: 'Arial', value: "Arial, sans-serif" },
         { label: 'Courier New', value: "'Courier New', monospace" },
         { label: 'Times New Roman', value: "'Times New Roman', serif" },
         { label: 'Verdana', value: "Verdana, sans-serif" }
-    ];
-
-    const fontSizes = [12, 14, 16, 18, 20, 24, 30];
-
-    const menu = new Menu();
-
-    // Fonts Submenu
-    const fontMenu = new Menu();
-    fontFamilies.forEach(f => {
-        fontMenu.append(new MenuItem({
+    ].forEach(f => {
+        familyMenu.append(new MenuItem({
             label: f.label,
             type: 'radio',
             checked: fontSettings.family === f.value,
             click: () => win.webContents.send('settings-changed', { key: 'family', value: f.value })
         }));
     });
-    menu.append(new MenuItem({ label: 'Fuente', submenu: fontMenu }));
+    fontMainSubmenu.append(new MenuItem({ label: 'Tipo de Letra', submenu: familyMenu }));
 
-    // Size Submenu
+    // Submenu: Tamaño
     const sizeMenu = new Menu();
-    fontSizes.forEach(size => {
+    [12, 14, 16, 18, 20, 24, 30].forEach(size => {
         sizeMenu.append(new MenuItem({
             label: `${size}px`,
             type: 'radio',
@@ -214,33 +278,63 @@ ipcMain.on('show-settings-menu', (event, { noteId, fontSettings }) => {
             click: () => win.webContents.send('settings-changed', { key: 'size', value: size })
         }));
     });
-    menu.append(new MenuItem({ label: 'Tamaño', submenu: sizeMenu }));
+    fontMainSubmenu.append(new MenuItem({ label: 'Tamaño', submenu: sizeMenu }));
 
-    menu.append(new MenuItem({ type: 'separator' }));
-
-    // Styles
-    menu.append(new MenuItem({
+    // Submenu: Estilo
+    const styleMenu = new Menu();
+    styleMenu.append(new MenuItem({
         label: 'Negrita',
         type: 'checkbox',
         checked: fontSettings.bold,
-        click: (menuItem) => win.webContents.send('settings-changed', { key: 'bold', value: menuItem.checked })
+        click: (item) => win.webContents.send('settings-changed', { key: 'bold', value: item.checked })
     }));
-    menu.append(new MenuItem({
+    styleMenu.append(new MenuItem({
         label: 'Cursiva',
         type: 'checkbox',
         checked: fontSettings.italic,
-        click: (menuItem) => win.webContents.send('settings-changed', { key: 'italic', value: menuItem.checked })
+        click: (item) => win.webContents.send('settings-changed', { key: 'italic', value: item.checked })
     }));
-    menu.append(new MenuItem({
+    styleMenu.append(new MenuItem({
         label: 'Subrayado',
         type: 'checkbox',
         checked: fontSettings.underline,
-        click: (menuItem) => win.webContents.send('settings-changed', { key: 'underline', value: menuItem.checked })
+        click: (item) => win.webContents.send('settings-changed', { key: 'underline', value: item.checked })
+    }));
+    fontMainSubmenu.append(new MenuItem({ label: 'Estilo', submenu: styleMenu }));
+
+    menu.append(new MenuItem({ label: 'Fuente', submenu: fontMainSubmenu }));
+
+    // --- COLOR SUBMENU ---
+    const colorMenu = new Menu();
+    [
+        { label: 'Amarillo', value: 'theme-yellow' },
+        { label: 'Azul', value: 'theme-blue' },
+        { label: 'Rosa', value: 'theme-pink' },
+        { label: 'Verde', value: 'theme-green' }
+    ].forEach(c => {
+        colorMenu.append(new MenuItem({
+            label: c.label,
+            type: 'radio',
+            checked: currentColor === c.value,
+            click: () => win.webContents.send('color-changed', c.value)
+        }));
+    });
+    menu.append(new MenuItem({ label: 'Color', submenu: colorMenu }));
+
+    menu.append(new MenuItem({ type: 'separator' }));
+
+    // --- ADMINISTRADOR ---
+    menu.append(new MenuItem({
+        label: 'Administrador de Notas',
+        click: () => {
+            win.webContents.send('force-save');
+            setTimeout(() => ipcMain.emit('open-manager'), 200);
+        }
     }));
 
     menu.append(new MenuItem({ type: 'separator' }));
 
-    // Advanced Submenu
+    // --- OPCIONES AVANZADAS ---
     const advancedMenu = new Menu();
     advancedMenu.append(new MenuItem({
         label: 'Cambiar Carpeta de Datos...',
@@ -249,7 +343,6 @@ ipcMain.on('show-settings-menu', (event, { noteId, fontSettings }) => {
             if (!result.canceled && result.filePaths.length > 0) {
                 const newPath = result.filePaths[0];
                 if (storage.setDirectory(newPath)) {
-                    // Notify renderer to show alert
                     win.webContents.send('storage-changed', newPath);
                 }
             }
@@ -273,6 +366,26 @@ ipcMain.on('show-settings-menu', (event, { noteId, fontSettings }) => {
     menu.append(new MenuItem({ label: 'Opciones Avanzadas', submenu: advancedMenu }));
 
     menu.popup({ window: win });
+});
+
+// Manager IPCs
+ipcMain.handle('get-all-notes-data', () => {
+    const allNotes = storage.getAllNotes();
+    // Ensure currently open windows are marked as open in the manager view
+    Object.keys(windows).forEach(noteId => {
+        if (allNotes[noteId]) {
+            allNotes[noteId].isOpen = true;
+        }
+    });
+    return allNotes;
+});
+
+ipcMain.on('reopen-note', (event, noteId) => {
+    if (windows[noteId]) {
+        windows[noteId].focus();
+    } else {
+        createNoteWindow(noteId);
+    }
 });
 
 // Get note data
