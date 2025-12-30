@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sticky Note</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div id="sticky-note" class="note-container">
+        <div class="note-header">
+            <button id="btn-add" class="btn-icon left-btn" title="Nueva nota">+</button>
+            <div class="drag-handle"></div>
+            <button id="btn-toggle-mode" class="btn-icon" title="Checklist">☑️</button>
+            <button id="btn-close" class="btn-icon" title="Cerrar">✕</button>
+        </div>
+
+        <!-- Content Container -->
+        <div id="content-area" class="note-content">
+            <!-- Text Mode -->
+            <textarea id="note-text" class="mode-text" placeholder="Escribe aquí..."></textarea>
+
+            <!-- Checklist Mode (Hidden by default) -->
+            <div id="note-checklist" class="mode-checklist hidden">
+                <!-- Items will be injected here -->
+            </div>
+        </div>
+    </div>
+    <script src="renderer.js"></script>
+</body>
+
+</html>
