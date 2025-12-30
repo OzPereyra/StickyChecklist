@@ -111,15 +111,17 @@ if (!gotTheLock) {
         });
 
         const notes = storage.getAllNotes();
-        const openNotes = Object.values(notes).filter(n => n.isOpen);
+        const noteList = Object.values(notes);
+        const openNotes = noteList.filter(n => n.isOpen);
 
         if (openNotes.length === 0) {
-            if (Object.keys(notes).length === 0) {
+            if (noteList.length === 0) {
                 // Fresh start: no notes at all
                 createNoteWindow(crypto.randomUUID());
             } else {
-                // Notes exist but all are closed: open Manager
-                openNoteManager();
+                // Notes exist but all are closed: open the most recent one instead of manager
+                const mostRecent = noteList.sort((a, b) => (b.lastModified || 0) - (a.lastModified || 0))[0];
+                createNoteWindow(mostRecent.id);
             }
         } else {
             openNotes.forEach(n => createNoteWindow(n.id));
@@ -128,12 +130,14 @@ if (!gotTheLock) {
         app.on('activate', () => {
             if (BrowserWindow.getAllWindows().length === 0) {
                 const notes = storage.getAllNotes();
-                const openNotes = Object.values(notes).filter(n => n.isOpen);
+                const noteList = Object.values(notes);
+                const openNotes = noteList.filter(n => n.isOpen);
                 if (openNotes.length === 0) {
-                    if (Object.keys(notes).length === 0) {
+                    if (noteList.length === 0) {
                         createNoteWindow(crypto.randomUUID());
                     } else {
-                        openNoteManager();
+                        const mostRecent = noteList.sort((a, b) => (b.lastModified || 0) - (a.lastModified || 0))[0];
+                        createNoteWindow(mostRecent.id);
                     }
                 }
             }
@@ -334,24 +338,12 @@ ipcMain.on('show-settings-menu', (event, { noteId, fontSettings, currentColor })
 
     menu.append(new MenuItem({ type: 'separator' }));
 
-    // --- OPCIONES AVANZADAS ---
-    const advancedMenu = new Menu();
-    advancedMenu.append(new MenuItem({
-        label: 'Cambiar Carpeta de Datos...',
-        click: async () => {
-            const result = await dialog.showOpenDialog(win, { properties: ['openDirectory'] });
-            if (!result.canceled && result.filePaths.length > 0) {
-                const newPath = result.filePaths[0];
-                if (storage.setDirectory(newPath)) {
-                    win.webContents.send('storage-changed', newPath);
-                }
-            }
-        }
-    }));
+    // --- CONFIGURACIÓN ---
+    const configMenu = new Menu();
 
     // Startup Check
     const openAtLogin = app.getLoginItemSettings().openAtLogin;
-    advancedMenu.append(new MenuItem({
+    configMenu.append(new MenuItem({
         label: 'Iniciar con Windows',
         type: 'checkbox',
         checked: openAtLogin,
@@ -363,7 +355,7 @@ ipcMain.on('show-settings-menu', (event, { noteId, fontSettings, currentColor })
         }
     }));
 
-    menu.append(new MenuItem({ label: 'Opciones Avanzadas', submenu: advancedMenu }));
+    menu.append(new MenuItem({ label: 'Configuración', submenu: configMenu }));
 
     menu.popup({ window: win });
 });
@@ -397,7 +389,6 @@ ipcMain.handle('get-note-data', (event, noteId) => {
 
 ipcMain.handle('get-app-settings', () => {
     return {
-        storagePath: storage.getDirectory(),
         openAtLogin: app.getLoginItemSettings().openAtLogin
     };
 });
@@ -407,17 +398,4 @@ ipcMain.on('set-startup', (event, enable) => {
         openAtLogin: enable,
         path: app.getPath('exe')
     });
-});
-
-ipcMain.handle('select-storage-folder', async () => {
-    const result = await dialog.showOpenDialog({
-        properties: ['openDirectory']
-    });
-    if (!result.canceled && result.filePaths.length > 0) {
-        const newPath = result.filePaths[0];
-        if (storage.setDirectory(newPath)) {
-            return newPath;
-        }
-    }
-    return null;
 });

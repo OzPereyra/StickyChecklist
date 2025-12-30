@@ -6,13 +6,21 @@ class StorageManager {
         this.baseDir = null;
     }
 
-    _getBaseDir() {
+    _initPaths() {
         if (!this.baseDir) {
             const { app } = require('electron');
             this.baseDir = path.join(app.getPath('documents'), 'StickyChecklist');
             this.ensureDirectoryExists(this.baseDir);
         }
+    }
+
+    _getBaseDir() {
+        this._initPaths();
         return this.baseDir;
+    }
+
+    getDirectory() {
+        return this._getBaseDir();
     }
 
     ensureDirectoryExists(dirPath) {
@@ -23,18 +31,6 @@ class StorageManager {
                 console.error('Failed to create directory:', error);
             }
         }
-    }
-
-    setDirectory(newPath) {
-        if (newPath && fs.existsSync(newPath)) {
-            this.baseDir = newPath;
-            return true;
-        }
-        return false;
-    }
-
-    getDirectory() {
-        return this._getBaseDir();
     }
 
     // Get all notes as object { id: data }
@@ -64,6 +60,8 @@ class StorageManager {
         if (!noteData.id) return;
         const base = this._getBaseDir();
         this.ensureDirectoryExists(base);
+
+        noteData.lastModified = Date.now();
 
         // Clean title for filename
         const safeTitle = (noteData.title || 'Sin Titulo')
