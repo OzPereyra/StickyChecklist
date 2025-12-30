@@ -428,8 +428,6 @@ ipcMain.on('show-settings-menu', (event, { noteId, fontSettings, currentColor, a
     });
     fontMainSubmenu.append(new MenuItem({ label: 'Tamaño', submenu: sizeMenu }));
 
-    fontMainSubmenu.append(new MenuItem({ label: 'Tamaño', submenu: sizeMenu }));
-
     menu.append(new MenuItem({ label: 'Fuente', submenu: fontMainSubmenu }));
 
     // --- COLOR SUBMENU ---
