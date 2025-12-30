@@ -307,6 +307,11 @@ ipcMain.on('show-settings-menu', (event, { noteId, fontSettings, currentColor, a
 
     const menu = new Menu();
 
+    // --- COPIAR Y PEGAR ---
+    menu.append(new MenuItem({ label: 'Copiar', role: 'copy' }));
+    menu.append(new MenuItem({ label: 'Pegar', role: 'paste' }));
+    menu.append(new MenuItem({ type: 'separator' }));
+
     // --- SIEMPRE ARRIBA ---
     menu.append(new MenuItem({
         label: 'Siempre Arriba',

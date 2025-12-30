@@ -18,9 +18,6 @@ const btnClose = document.getElementById('btn-close');
 const btnAdd = document.getElementById('btn-add');
 const btnToggle = document.getElementById('btn-toggle-mode');
 
-// New Controls
-const btnCopy = document.getElementById('btn-copy');
-const btnPaste = document.getElementById('btn-paste');
 const btnSettings = document.getElementById('btn-settings');
 const settingsMenu = document.getElementById('settings-menu');
 
@@ -318,62 +315,6 @@ btnToggle.addEventListener('click', () => {
 noteTitleInput.addEventListener('input', () => {
     noteData.title = noteTitleInput.value;
     save();
-});
-
-// Copy
-btnCopy.addEventListener('click', () => {
-    const selectedText = window.getSelection().toString();
-    if (selectedText) {
-        clipboard.writeText(selectedText);
-    } else {
-        clipboard.writeText(noteData.content); // Copy all content
-    }
-});
-
-// Paste
-btnPaste.addEventListener('click', () => {
-    const text = clipboard.readText();
-    if (!text) return;
-
-    if (currentMode === 'text') {
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-
-        // If cursor not focused or active, maybe append? 
-        // User asked "pegar en donde este el puntero o en caso de no tener el puntero... pegar en una nueva linea".
-        // Note: textarea.selectionStart works even if not focused, usually 0 or last pos.
-        // We will insert at selection.
-
-        const currentVal = textarea.value;
-        const newVal = currentVal.substring(0, start) + text + currentVal.substring(end);
-
-        // If selection start/end are 0 and length is 0, append new line? 
-        // Just standard paste behavior satisfies "at pointer". 
-        // "Si no tener el puntero en alguna parte... nueva linea".
-        // If we want to simulate "new line" if not focused? Hard to tell if "not focused".
-        // Let's assume standard insert is fine, maybe ensure focus.
-        textarea.focus();
-
-        // Executing insert
-        // document.execCommand('insertText') is better for history but deprecated. 
-        // Direct value manipulation modifies history. 
-        // Let's simple value mod:
-        textarea.value = newVal;
-        textarea.selectionStart = textarea.selectionEnd = start + text.length;
-
-        noteData.content = textarea.value;
-        save();
-    } else {
-        // Checklist Paste
-        // Add new items from text
-        const newItems = textToChecklist(text);
-        // Append? Or Insert? 
-        // Simpler to append for now or map to current list.
-        const currentText = noteData.content + (noteData.content.endsWith('\n') ? '' : '\n') + text;
-        noteData.content = currentText;
-        renderChecklist(noteData.content);
-        save();
-    }
 });
 
 // Settings Toggle -> Now invokes Native Menu
