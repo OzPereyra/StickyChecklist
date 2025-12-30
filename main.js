@@ -5,7 +5,7 @@ const crypto = require('crypto');
 
 // Initialize store
 const store = new Store({
-    configName: 'user-preferences',
+    configName: 'sticky-checklist-preferences',
     defaults: {
         notes: {} // Object structure: { [id]: { id, x, y, color, content, type (text/list) } }
     }
@@ -16,16 +16,29 @@ let windows = {}; // Track open windows by ID
 function createNoteWindow(noteId, options = {}) {
     // Default config if new
     const defaults = {
-        width: 300,
+        width: 320, // Slightly wider for new toolbar
         height: 350,
         x: undefined,
         y: undefined,
         color: 'theme-yellow',
         content: '',
-        type: 'text' // or 'checklist'
+        title: 'Sticky Checklist',
+        type: 'text', // or 'checklist'
+        fontSettings: {
+            family: "'Outfit', sans-serif",
+            size: 16,
+            bold: false,
+            italic: false,
+            underline: false
+        }
     };
 
     const noteData = store.get('notes')[noteId] || { ...defaults, id: noteId, ...options };
+    // Merge defaults if existing note is missing new fields
+    if (store.get('notes')[noteId]) {
+        noteData.fontSettings = { ...defaults.fontSettings, ...(noteData.fontSettings || {}) };
+        if (!noteData.title) noteData.title = defaults.title;
+    }
 
     // Save initial state if it's new
     if (!store.get('notes')[noteId]) {
@@ -35,11 +48,11 @@ function createNoteWindow(noteId, options = {}) {
     }
 
     const win = new BrowserWindow({
-        width: 300,
+        width: 320,
         height: 350,
         x: noteData.x,
         y: noteData.y,
-        minWidth: 200,
+        minWidth: 250,
         minHeight: 200,
         frame: false,
         transparent: true,
@@ -149,13 +162,15 @@ ipcMain.on('delete-note', (event, noteId) => {
     store.set('notes', notes);
 });
 
-// Update note data (content, color, type)
-ipcMain.on('update-note-data', (event, { id, content, color, type }) => {
+// Update note data (content, color, type, title, fontSettings)
+ipcMain.on('update-note-data', (event, { id, content, color, type, title, fontSettings }) => {
     const notes = store.get('notes');
     if (notes[id]) {
         if (content !== undefined) notes[id].content = content;
         if (color !== undefined) notes[id].color = color;
         if (type !== undefined) notes[id].type = type;
+        if (title !== undefined) notes[id].title = title;
+        if (fontSettings !== undefined) notes[id].fontSettings = fontSettings;
         store.set('notes', notes);
     }
 });

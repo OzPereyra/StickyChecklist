@@ -4,31 +4,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sticky Note</title>
+    <title>Sticky Checklist</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 
-<body>
-    <div id="sticky-note" class="note-container">
-        <div class="note-header">
-            <button id="btn-add" class="btn-icon left-btn" title="Nueva nota">+</button>
-            <div class="drag-handle"></div>
-            <button id="btn-toggle-mode" class="btn-icon" title="Checklist">☑️</button>
+<div id="sticky-note" class="note-container">
+    <!-- New Header Structure -->
+    <div class="note-header">
+        <div class="header-left">
+            <button id="btn-drag" class="btn-icon drag-handle-btn" title="Arrastrar">✥</button>
+            <input type="text" id="note-title" class="note-title" placeholder="Título" value="Sticky Checklist">
+        </div>
+        <div class="header-right">
+            <button id="btn-copy" class="btn-icon" title="Copiar">📋</button>
+            <button id="btn-paste" class="btn-icon" title="Pegar">📌</button>
+            <div class="settings-wrapper">
+                <button id="btn-settings" class="btn-icon" title="Configuración">⚙️</button>
+                <!-- Settings Dropdown -->
+                <div id="settings-menu" class="settings-menu hidden">
+                    <div class="settings-group">
+                        <label>Fuente</label>
+                        <select id="font-family">
+                            <option value="'Outfit', sans-serif">Outfit</option>
+                            <option value="Arial, sans-serif">Arial</option>
+                            <option value="'Courier New', monospace">Courier</option>
+                            <option value="'Times New Roman', serif">Times</option>
+                            <option value="Verdana, sans-serif">Verdana</option>
+                        </select>
+                    </div>
+                    <div class="settings-group">
+                        <label>Tamaño</label>
+                        <input type="number" id="font-size" value="16" min="10" max="30">
+                    </div>
+                    <div class="settings-group toggle-group">
+                        <button id="btn-bold" class="btn-toggle" title="Negrita"><b>B</b></button>
+                        <button id="btn-italic" class="btn-toggle" title="Cursiva"><i>I</i></button>
+                        <button id="btn-underline" class="btn-toggle" title="Subrayado"><u>U</u></button>
+                    </div>
+                </div>
+            </div>
+            <button id="btn-toggle-mode" class="btn-icon" title="Alternar Check/Texto">☑️</button>
             <button id="btn-close" class="btn-icon" title="Cerrar">✕</button>
         </div>
+    </div>
 
-        <!-- Content Container -->
-        <div id="content-area" class="note-content">
-            <!-- Text Mode -->
-            <textarea id="note-text" class="mode-text" placeholder="Escribe aquí..."></textarea>
+    <!-- Content Container -->
+    <div id="content-area" class="note-content">
+        <!-- Text Mode -->
+        <textarea id="note-text" class="mode-text" placeholder="Escribe aquí..."></textarea>
 
-            <!-- Checklist Mode (Hidden by default) -->
-            <div id="note-checklist" class="mode-checklist hidden">
-                <!-- Items will be injected here -->
-            </div>
+        <!-- Checklist Mode (Hidden by default) -->
+        <div id="note-checklist" class="mode-checklist hidden">
+            <!-- Items will be injected here -->
         </div>
     </div>
-    <script src="renderer.js"></script>
+
+    <!-- Add Button (Floating bottom right or somewhere? Original code had it in header but user desc puts drag/title/settings in header. Let's keep Add button functionality accessible? Previous design had it in header. User didn't explicitly ask to remove it, but described a full header. I'll put it in header right or floating? 
+        The request: "corner top left side of close button" ? No "top left side of title...". 
+        "Todo lo anterior en la esquina superior izquierda al lado del boton cerrar" -> Wait.
+        "Button configuracion... en la esquina superior izquierda al lado del boton cerrar". 
+        Actually likely means "Top Right" near close button for settings/copy/paste? Usually close is Top Right.
+        Let's assume "Esquina superior izquierda" for Drag & Title. And "Esquina superior derecha" (near close) for Settings/Copy/Paste.
+        The user wrote: "todo lo anterior en la esquina superior izquierda al lado del boton cerrar". 
+        If Close is Top Left? MacOS style? 
+        Let's look at previous CSS. Close button was in `.note-header` with `justify-content: flex-end`. So Close was on Top Right.
+        User said "top left side of close button". So [Settings] [Close] on the Right.
+        And "Title in top left".
+        And "Drag button before title".
+        So: [Drag] [Title] ........... [Copy] [Paste] [Settings] [Close]
+        This matches standard UI.
+        
+        Where did the "+" button go? Original had `btn-add`. I should keep it? User didn't mention it. I'll keep it in the header for utility, maybe next to close? Or remove it if space is tight? I'll keep it.
+        -->
+    <button id="btn-add" class="floating-add-btn" title="Nueva nota">+</button>
+</div>
+<script src="renderer.js"></script>
 </body>
 
 </html>

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700&display=swap');
 
 * {
     box-sizing: border-box;
@@ -18,75 +18,203 @@ html {
 .note-container {
     width: 100%;
     height: 100%;
-    border-radius: 0;
-    /* Square corners look a bit better for pure stickies? No, user wanted floating. Let's keep rounded. */
-    border-radius: 20px;
+    border-radius: 10px;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
     transition: background-color 0.5s ease;
     background-color: #fff7b9;
     overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.4);
+    border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
+/* Header Layout */
 .note-header {
-    height: 40px;
+    height: 48px;
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
     align-items: center;
-    padding: 0 10px;
+    padding: 0 8px;
+    -webkit-app-region: no-drag;
+    /* We use specific drag button now */
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* Drag Button */
+.drag-handle-btn {
     -webkit-app-region: drag;
     cursor: grab;
-}
-
-.note-header:active {
-    cursor: grabbing;
-}
-
-.drag-handle {
-    flex-grow: 1;
-    height: 100%;
-}
-
-.btn-icon {
-    -webkit-app-region: no-drag;
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 1.2rem;
-    color: rgba(0, 0, 0, 0.4);
-    transition: all 0.2s;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
+    width: 24px;
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-left: 5px;
-}
-
-.btn-icon.left-btn {
-    margin-left: 0;
+    font-size: 1.2rem;
+    color: rgba(0, 0, 0, 0.4);
+    background: transparent;
+    border: none;
     margin-right: 5px;
 }
 
+.drag-handle-btn:active {
+    cursor: grabbing;
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+
+/* Title Input */
+.note-title {
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 500;
+    font-size: 1.1rem;
+    /* 1pt bigger than content usually approx 1.1rem vs 1rem */
+    color: #333;
+    width: 100%;
+    text-overflow: ellipsis;
+}
+
+.note-title::placeholder {
+    color: rgba(0, 0, 0, 0.3);
+}
+
+/* Buttons */
+.btn-icon {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    color: rgba(0, 0, 0, 0.5);
+    transition: all 0.2s;
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 2px;
+}
+
 .btn-icon:hover {
-    color: rgba(0, 0, 0, 0.8);
-    background-color: rgba(255, 255, 255, 0.3);
+    color: rgba(0, 0, 0, 0.9);
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Floating Add Button */
+.floating-add-btn {
+    position: absolute;
+    bottom: 15px;
+    right: 15px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.5);
+    border: none;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    font-size: 1.5rem;
+    color: #444;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    z-index: 10;
+}
+
+.floating-add-btn:hover {
+    background-color: rgba(255, 255, 255, 0.8);
     transform: scale(1.1);
 }
 
+/* Settings Menu */
+.settings-wrapper {
+    position: relative;
+}
+
+.settings-menu {
+    position: absolute;
+    top: 35px;
+    right: 0;
+    width: 200px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 100;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.settings-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.settings-group label {
+    font-size: 0.8rem;
+    color: #666;
+    font-weight: 500;
+}
+
+.settings-group select,
+.settings-group input {
+    padding: 5px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.9rem;
+}
+
+.toggle-group {
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.btn-toggle {
+    flex: 1;
+    padding: 5px;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    cursor: pointer;
+    margin: 0 2px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.btn-toggle.active {
+    background: #e0e0e0;
+    border-color: #bbb;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Content Area */
 .note-content {
     flex-grow: 1;
-    padding: 10px 20px 20px 20px;
+    padding: 10px 15px 30px 15px;
+    /* Bottom padding for floating button */
     overflow-y: auto;
-    /* Allow scrolling */
     display: flex;
     flex-direction: column;
 }
 
-/* Scrollbar styling for content */
 .note-content::-webkit-scrollbar {
     width: 6px;
 }
@@ -96,10 +224,6 @@ html {
     border-radius: 3px;
 }
 
-.note-content::-webkit-scrollbar-track {
-    background: transparent;
-}
-
 textarea {
     width: 100%;
     height: 100%;
@@ -107,43 +231,38 @@ textarea {
     border: none;
     resize: none;
     outline: none;
-    font-size: 1.2rem;
-    color: #4a4a4a;
-    font-family: 'Outfit', sans-serif;
+    font-size: 1rem;
+    color: #333;
+    font-family: inherit;
     line-height: 1.5;
     flex-grow: 1;
-}
-
-textarea::placeholder {
-    color: rgba(0, 0, 0, 0.3);
 }
 
 .hidden {
     display: none !important;
 }
 
-/* Checklist Styles */
+/* Checklist */
 .mode-checklist {
     width: 100%;
-    height: 100%;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .checklist-item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    font-size: 1.1rem;
-    color: #4a4a4a;
-    animation: fadeIn 0.3s ease;
+    gap: 8px;
+    font-size: 1rem;
+    color: #333;
+    animation: fadeIn 0.2s ease;
 }
 
 @keyframes fadeIn {
     from {
         opacity: 0;
-        transform: translateY(5px);
+        transform: translateY(2px);
     }
 
     to {
@@ -154,26 +273,26 @@ textarea::placeholder {
 
 .checklist-item input[type="checkbox"] {
     appearance: none;
-    width: 18px;
-    height: 18px;
-    border: 2px solid rgba(0, 0, 0, 0.3);
-    border-radius: 4px;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(0, 0, 0, 0.4);
+    border-radius: 3px;
     cursor: pointer;
     position: relative;
     flex-shrink: 0;
 }
 
 .checklist-item input[type="checkbox"]:checked {
-    background-color: rgba(0, 0, 0, 0.5);
-    border-color: rgba(0, 0, 0, 0.5);
+    background-color: rgba(0, 0, 0, 0.6);
+    border-color: transparent;
 }
 
 .checklist-item input[type="checkbox"]:checked::after {
-    content: '✔';
+    content: '✓';
     position: absolute;
     color: white;
-    font-size: 12px;
-    top: -1px;
+    font-size: 10px;
+    top: 0;
     left: 2px;
 }
 
@@ -181,16 +300,19 @@ textarea::placeholder {
     background: transparent;
     border: none;
     outline: none;
-    font-family: 'Outfit', sans-serif;
-    font-size: 1.1rem;
-    color: #4a4a4a;
+    font-family: inherit;
+    font-size: inherit;
+    /* Inherit font settings */
+    font-weight: inherit;
+    font-style: inherit;
+    text-decoration: inherit;
+    color: inherit;
     flex-grow: 1;
     border-bottom: 1px solid transparent;
-    transition: border-color 0.2s;
 }
 
 .checklist-item input[type="text"]:focus {
-    border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .checklist-item.completed input[type="text"] {
