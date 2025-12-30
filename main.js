@@ -15,14 +15,19 @@ function createNoteWindow(noteId, options = {}) {
         color: 'theme-yellow',
         content: '',
         title: 'Sticky Checklist',
-        type: 'text',
+        type: 'checklist',
         isOpen: true,
+        alwaysOnTop: true,
         fontSettings: {
             family: "'Outfit', sans-serif",
             size: 16,
             bold: false,
             italic: false,
             underline: false
+        },
+        appearance: {
+            borderRadius: 12,
+            opacity: 100
         }
     };
 
@@ -35,6 +40,8 @@ function createNoteWindow(noteId, options = {}) {
     // Merge defaults
     if (allNotes[noteId]) {
         noteData.fontSettings = { ...defaults.fontSettings, ...(noteData.fontSettings || {}) };
+        noteData.appearance = { ...defaults.appearance, ...(noteData.appearance || {}) };
+        if (noteData.alwaysOnTop === undefined) noteData.alwaysOnTop = defaults.alwaysOnTop;
         if (!noteData.title) noteData.title = defaults.title;
     }
 
@@ -51,7 +58,7 @@ function createNoteWindow(noteId, options = {}) {
         frame: false,
         transparent: true,
         resizable: true,
-        alwaysOnTop: true,
+        alwaysOnTop: noteData.alwaysOnTop,
         skipTaskbar: false,
         webPreferences: {
             nodeIntegration: true,
@@ -244,12 +251,25 @@ ipcMain.on('manager-minimize', () => {
     if (managerWin) managerWin.minimize();
 });
 
-ipcMain.on('show-settings-menu', (event, { noteId, fontSettings, currentColor }) => {
+ipcMain.on('show-settings-menu', (event, { noteId, fontSettings, currentColor, alwaysOnTop, appearance }) => {
     const { Menu, MenuItem } = require('electron');
     const win = windows[noteId] || BrowserWindow.fromWebContents(event.sender);
     if (!win) return;
 
     const menu = new Menu();
+
+    // --- SIEMPRE ARRIBA ---
+    menu.append(new MenuItem({
+        label: 'Siempre Arriba',
+        type: 'checkbox',
+        checked: alwaysOnTop,
+        click: (item) => {
+            win.setAlwaysOnTop(item.checked);
+            win.webContents.send('settings-changed', { key: 'alwaysOnTop', value: item.checked });
+        }
+    }));
+
+    menu.append(new MenuItem({ type: 'separator' }));
 
     // --- FUENTE SUBMENU ---
     const fontMainSubmenu = new Menu();
@@ -324,6 +344,41 @@ ipcMain.on('show-settings-menu', (event, { noteId, fontSettings, currentColor })
         }));
     });
     menu.append(new MenuItem({ label: 'Color', submenu: colorMenu }));
+
+    // --- APARIENCIA SUBMENU ---
+    const appearMenu = new Menu();
+
+    // Bordes
+    const radiusMenu = new Menu();
+    [
+        { label: 'Cuadrado', value: 0 },
+        { label: 'Suave', value: 8 },
+        { label: 'Redondeado', value: 16 },
+        { label: 'Muy Redondeado', value: 24 },
+        { label: 'Cápsula', value: 40 }
+    ].forEach(r => {
+        radiusMenu.append(new MenuItem({
+            label: r.label,
+            type: 'radio',
+            checked: appearance.borderRadius === r.value,
+            click: () => win.webContents.send('appearance-changed', { key: 'borderRadius', value: r.value })
+        }));
+    });
+    appearMenu.append(new MenuItem({ label: 'Redondeado de Bordes', submenu: radiusMenu }));
+
+    // Opacidad
+    const opacityMenu = new Menu();
+    [100, 95, 90, 80, 70, 60].forEach(o => {
+        opacityMenu.append(new MenuItem({
+            label: `${o}%`,
+            type: 'radio',
+            checked: appearance.opacity === o,
+            click: () => win.webContents.send('appearance-changed', { key: 'opacity', value: o })
+        }));
+    });
+    appearMenu.append(new MenuItem({ label: 'Opacidad', submenu: opacityMenu }));
+
+    menu.append(new MenuItem({ label: 'Apariencia', submenu: appearMenu }));
 
     menu.append(new MenuItem({ type: 'separator' }));
 

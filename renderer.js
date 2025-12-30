@@ -34,18 +34,23 @@ const btnUnderline = document.getElementById('btn-underline');
 */
 
 
-let currentMode = 'text'; // 'text' or 'checklist'
+let currentMode = 'checklist'; // 'text' or 'checklist'
 let noteData = {
     content: '',
     color: 'theme-yellow',
-    type: 'text',
+    type: 'checklist',
     title: 'Sticky Checklist',
+    alwaysOnTop: true,
     fontSettings: {
         family: "'Outfit', sans-serif",
         size: 16,
         bold: false,
         italic: false,
         underline: false
+    },
+    appearance: {
+        borderRadius: 12,
+        opacity: 100
     }
 };
 
@@ -57,17 +62,9 @@ let noteData = {
         // Merge defaults if missing (just in case)
         noteData = { ...noteData, ...data };
         if (!noteData.fontSettings) noteData.fontSettings = { family: "'Outfit', sans-serif", size: 16 };
+        if (!noteData.appearance) noteData.appearance = { borderRadius: 12, opacity: 100 };
+        if (noteData.alwaysOnTop === undefined) noteData.alwaysOnTop = true;
         applyState();
-    }
-
-    // Load App Settings
-    try {
-        const appSettings = await ipcRenderer.invoke('get-app-settings');
-        pathDisplay.innerText = appSettings.storagePath || '...';
-        pathDisplay.title = appSettings.storagePath;
-        chkStartup.checked = appSettings.openAtLogin;
-    } catch (e) {
-        console.log('Error loading settings', e);
     }
 })();
 
@@ -79,19 +76,13 @@ function applyState() {
     // Set Title
     noteTitleInput.value = noteData.title || 'Sticky Checklist';
 
-    // Set Font Settings
+    // Set Font & Appearance
     applyFontSettings();
-
-    // Set Settings Menu Values (Native menu handles this via 'checked' prop when opening)
-    // fontSelect.value = noteData.fontSettings.family;
-    // fontSizeInput.value = noteData.fontSettings.size;
-    // if (noteData.fontSettings.bold) btnBold.classList.add('active');
-    // if (noteData.fontSettings.italic) btnItalic.classList.add('active');
-    // if (noteData.fontSettings.underline) btnUnderline.classList.add('active');
+    applyAppearance();
 
 
     // Set Content & Mode
-    currentMode = noteData.type || 'text';
+    currentMode = noteData.type || 'checklist';
 
     if (currentMode === 'text') {
         textarea.value = noteData.content;
@@ -102,6 +93,12 @@ function applyState() {
         checklistContainer.classList.remove('hidden');
         textarea.classList.add('hidden');
     }
+}
+
+function applyAppearance() {
+    const a = noteData.appearance;
+    noteContainer.style.borderRadius = (a.borderRadius || 12) + 'px';
+    noteContainer.style.opacity = (a.opacity || 100) / 100;
 }
 
 function applyFontSettings() {
@@ -341,20 +338,34 @@ btnSettings.addEventListener('click', (e) => {
     ipcRenderer.send('show-settings-menu', {
         noteId,
         fontSettings: noteData.fontSettings,
-        currentColor: noteData.color
+        currentColor: noteData.color,
+        alwaysOnTop: noteData.alwaysOnTop,
+        appearance: noteData.appearance
     });
 });
 
 // Remove old HTML menu listener if exists (clean up logic)
 // Listen for updates from Native Menu
 ipcRenderer.on('settings-changed', (event, { key, value }) => {
-    updateFontSettings(key, value);
+    if (key === 'alwaysOnTop') {
+        noteData.alwaysOnTop = value;
+        save();
+    } else {
+        updateFontSettings(key, value);
+    }
+});
+
+ipcRenderer.on('appearance-changed', (event, { key, value }) => {
+    noteData.appearance[key] = value;
+    applyAppearance();
+    save();
 });
 
 ipcRenderer.on('color-changed', (event, newColor) => {
     noteContainer.classList.remove(...colors);
     noteContainer.classList.add(newColor);
     noteData.color = newColor;
+    if (noteData.appearance.opacity < 100) applyAppearance(); // Re-apply opacity if needed
     save();
 });
 
@@ -459,7 +470,9 @@ function save() {
         color: noteData.color,
         type: noteData.type,
         title: noteData.title,
-        fontSettings: noteData.fontSettings
+        fontSettings: noteData.fontSettings,
+        alwaysOnTop: noteData.alwaysOnTop,
+        appearance: noteData.appearance
     });
 }
 
