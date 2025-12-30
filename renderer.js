@@ -1,5 +1,17 @@
 const { ipcRenderer, clipboard } = require('electron');
 
+function focusAtEnd(el) {
+    el.focus();
+    if (typeof window.getSelection !== "undefined" && typeof document.createRange !== "undefined") {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }
+}
+
 const noteIdArg = process.argv.find(arg => arg.startsWith('--noteId='));
 // Advanced Inputs (Native Menu used)
 /*
@@ -213,6 +225,14 @@ function renderChecklist(contentString) {
         const row = document.createElement('div');
         row.className = `checklist-item ${item.checked ? 'completed' : ''}`;
 
+        // Focus at end when clicking the row area
+        row.addEventListener('mousedown', (e) => {
+            if (e.target === row) {
+                e.preventDefault();
+                focusAtEnd(input);
+            }
+        });
+
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.checked = item.checked;
@@ -424,6 +444,20 @@ function shouldTriggerSave(current) {
 
     return false;
 }
+
+// Click content area to focus at end of text
+document.getElementById('content-area').addEventListener('mousedown', (e) => {
+    if (e.target === document.getElementById('content-area')) {
+        e.preventDefault();
+        if (currentMode === 'text') {
+            focusAtEnd(textarea);
+        } else {
+            // Focus last checklist item
+            const inputs = checklistContainer.querySelectorAll('div[contenteditable]');
+            if (inputs.length > 0) focusAtEnd(inputs[inputs.length - 1]);
+        }
+    }
+});
 
 // Event Listeners (Refined)
 textarea.addEventListener('input', () => {

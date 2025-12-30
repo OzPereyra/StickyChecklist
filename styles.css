@@ -202,6 +202,8 @@ textarea {
     word-break: break-all;
     min-height: 100%;
     display: block;
+    cursor: text;
+    width: 100%;
 }
 
 .mode-text:focus {
@@ -291,6 +293,7 @@ textarea {
     min-height: 1.2em;
     word-break: break-all;
     outline: none !important;
+    cursor: text;
 }
 
 .checklist-item div[contenteditable]:focus {
