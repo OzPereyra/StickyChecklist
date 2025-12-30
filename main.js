@@ -552,7 +552,7 @@ ipcMain.on('show-settings-menu', (event, { noteId, fontSettings, currentColor, a
     menu.popup({ window: win });
 });
 
-ipcMain.on('show-context-menu', (event, { noteId, fontSettings }) => {
+ipcMain.on('show-context-menu', (event, { noteId, fontSettings, selectionState }) => {
     const { Menu, MenuItem } = require('electron');
     const win = windows[noteId] || BrowserWindow.fromWebContents(event.sender);
     if (!win) return;
@@ -569,20 +569,20 @@ ipcMain.on('show-context-menu', (event, { noteId, fontSettings }) => {
     menu.append(new MenuItem({
         label: 'Negrita',
         type: 'checkbox',
-        checked: fontSettings.bold,
-        click: (item) => win.webContents.send('settings-changed', { key: 'bold', value: item.checked })
+        checked: selectionState.bold,
+        click: () => win.webContents.send('settings-changed', { key: 'bold', value: !selectionState.bold })
     }));
     menu.append(new MenuItem({
         label: 'Cursiva',
         type: 'checkbox',
-        checked: fontSettings.italic,
-        click: (item) => win.webContents.send('settings-changed', { key: 'italic', value: item.checked })
+        checked: selectionState.italic,
+        click: () => win.webContents.send('settings-changed', { key: 'italic', value: !selectionState.italic })
     }));
     menu.append(new MenuItem({
         label: 'Subrayado',
         type: 'checkbox',
-        checked: fontSettings.underline,
-        click: (item) => win.webContents.send('settings-changed', { key: 'underline', value: item.checked })
+        checked: selectionState.underline,
+        click: () => win.webContents.send('settings-changed', { key: 'underline', value: !selectionState.underline })
     }));
 
     menu.popup({ window: win });

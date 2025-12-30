@@ -15,6 +15,11 @@ html {
     font-family: 'Outfit', sans-serif;
 }
 
+.note-container * {
+    outline: none !important;
+    -webkit-tap-highlight-color: transparent;
+}
+
 .note-container {
     width: 100%;
     height: 100%;
@@ -171,19 +176,43 @@ html {
     border-radius: 3px;
 }
 
+textarea,
+.mode-text,
+.note-title,
+[contenteditable] {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
 textarea {
     width: 100%;
     height: 100%;
     background: transparent;
     border: none;
     resize: none;
-    outline: none;
+    outline: none !important;
+    box-shadow: none !important;
     font-size: 1rem;
     color: var(--title-color, #333);
     opacity: 0.9;
     font-family: inherit;
     line-height: 1.5;
     flex-grow: 1;
+    white-space: pre-wrap;
+    word-break: break-all;
+    min-height: 100%;
+    display: block;
+}
+
+.mode-text:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.mode-text:empty:before {
+    content: attr(data-placeholder);
+    color: rgba(0, 0, 0, 0.3);
+    pointer-events: none;
 }
 
 .hidden {
@@ -258,6 +287,21 @@ textarea {
     color: inherit;
     flex-grow: 1;
     border-bottom: 1px solid transparent;
+    padding: 2px 4px;
+    min-height: 1.2em;
+    word-break: break-all;
+    outline: none !important;
+}
+
+.checklist-item div[contenteditable]:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.checklist-item div[contenteditable]:empty:before {
+    content: "...";
+    color: rgba(0, 0, 0, 0.2);
+    pointer-events: none;
 }
 
 .checklist-item input[type="text"]:focus {

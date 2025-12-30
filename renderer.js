@@ -54,6 +54,9 @@ let noteData = {
 
 // Initialize
 (async () => {
+    // Rich Text Defaults
+    document.execCommand('defaultParagraphSeparator', false, 'div');
+
     // Load Note Data
     const data = await ipcRenderer.invoke('get-note-data', noteId);
     const globalSettings = await ipcRenderer.invoke('get-global-settings');
@@ -120,7 +123,7 @@ function applyState() {
     currentMode = noteData.type || 'checklist';
 
     if (currentMode === 'text') {
-        textarea.value = noteData.content;
+        textarea.innerHTML = noteData.content;
         textarea.classList.remove('hidden');
         checklistContainer.classList.add('hidden');
     } else {
@@ -154,6 +157,8 @@ function applyFontSettings() {
     `;
 
     textarea.style.cssText = styleString;
+    textarea.style.whiteSpace = 'pre-wrap';
+    textarea.style.wordBreak = 'break-all';
     // For title: 1pt bigger (approx 1.33px bigger or just +2px for simplicity?)
     noteTitleInput.style.fontFamily = s.family;
     noteTitleInput.style.fontSize = (parseInt(s.size) + 2) + 'px';
@@ -225,9 +230,9 @@ function renderChecklist(contentString) {
             }
         });
 
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.value = item.text;
+        const input = document.createElement('div');
+        input.contentEditable = "true";
+        input.innerHTML = item.text;
         input.placeholder = '...';
 
         // Apply current styles
@@ -244,7 +249,7 @@ function renderChecklist(contentString) {
         }
 
         input.addEventListener('input', () => {
-            items[index].text = input.value;
+            items[index].text = input.innerHTML;
         });
         attachChecklistSaveListener(input, items);
 
@@ -255,27 +260,27 @@ function renderChecklist(contentString) {
                 updateContentFromChecklist(items); // Instant save on Enter
                 renderChecklist(checklistToText(items));
                 setTimeout(() => {
-                    const inputs = checklistContainer.querySelectorAll('input[type="text"]');
+                    const inputs = checklistContainer.querySelectorAll('div[contenteditable]');
                     if (inputs[index + 1]) inputs[index + 1].focus();
                 }, 0);
-            } else if (e.key === 'Backspace' && input.value === '') {
+            } else if (e.key === 'Backspace' && (input.innerHTML === '' || input.innerHTML === '<br>')) {
                 if (items.length > 1) {
                     e.preventDefault();
                     items.splice(index, 1);
                     updateContentFromChecklist(items);
                     renderChecklist(checklistToText(items));
                     setTimeout(() => {
-                        const inputs = checklistContainer.querySelectorAll('input[type="text"]');
+                        const inputs = checklistContainer.querySelectorAll('div[contenteditable]');
                         if (inputs[index - 1]) inputs[index - 1].focus();
                     }, 0);
                 }
             } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
-                const inputs = checklistContainer.querySelectorAll('input[type="text"]');
+                const inputs = checklistContainer.querySelectorAll('div[contenteditable]');
                 if (inputs[index - 1]) inputs[index - 1].focus();
             } else if (e.key === 'ArrowDown') {
                 e.preventDefault();
-                const inputs = checklistContainer.querySelectorAll('input[type="text"]');
+                const inputs = checklistContainer.querySelectorAll('div[contenteditable]');
                 if (inputs[index + 1]) inputs[index + 1].focus();
             }
         });
@@ -297,13 +302,13 @@ function updateContentFromChecklist(items) {
 btnToggle.addEventListener('click', () => {
     if (currentMode === 'text') {
         currentMode = 'checklist';
-        noteData.content = textarea.value;
+        noteData.content = textarea.innerHTML;
         renderChecklist(noteData.content);
         textarea.classList.add('hidden');
         checklistContainer.classList.remove('hidden');
     } else {
         currentMode = 'text';
-        textarea.value = noteData.content;
+        textarea.innerHTML = noteData.content;
         checklistContainer.classList.add('hidden');
         textarea.classList.remove('hidden');
     }
@@ -335,6 +340,10 @@ btnSettings.addEventListener('click', (e) => {
 ipcRenderer.on('settings-changed', (event, { key, value }) => {
     if (key === 'alwaysOnTop') {
         noteData.alwaysOnTop = value;
+        save();
+    } else if (key === 'bold' || key === 'italic' || key === 'underline') {
+        // Now selection based from menu too
+        document.execCommand(key);
         save();
     } else {
         updateFontSettings(key, value);
@@ -394,20 +403,22 @@ function shouldTriggerSave(current) {
     if (current === lastSavedContent) return false;
     if (current.length === 0) return true;
 
-    const lastChar = current.slice(-1);
+    // Condition: New Line / Block in HTML
+    if (current.endsWith('</div>') || current.endsWith('<br>') || current.endsWith('<br/>')) return true;
 
-    // Condition: Enter / New Line
-    if (lastChar === '\n') return true;
+    const plainText = current.replace(/<[^>]*>/g, '');
+    if (plainText.length === 0) return false;
+    const lastChar = plainText.slice(-1);
 
-    // Condition: Two spaces
-    if (current.endsWith('  ')) return true;
+    // Condition: Two spaces (approximation in HTML)
+    if (current.endsWith('&nbsp;&nbsp;') || current.endsWith('  ')) return true;
 
     // Condition: Special characters or punctuation
     if (/[.,!?;:()=+-]/.test(lastChar)) return true;
 
-    // Condition: Space after word, save every 2 words approximately
-    if (lastChar === ' ') {
-        const wordsCount = current.trim().split(/\s+/).length;
+    // Condition: Space after word
+    if (lastChar === ' ' || current.endsWith('&nbsp;')) {
+        const wordsCount = plainText.trim().split(/\s+/).length;
         if (wordsCount % 2 === 0) return true;
     }
 
@@ -416,7 +427,7 @@ function shouldTriggerSave(current) {
 
 // Event Listeners (Refined)
 textarea.addEventListener('input', () => {
-    const content = textarea.value;
+    const content = textarea.innerHTML;
     if (shouldTriggerSave(content)) {
         noteData.content = content;
         save();
@@ -427,7 +438,7 @@ textarea.addEventListener('input', () => {
 // For Checklist, we apply similar logic to each input
 function attachChecklistSaveListener(input, items) {
     input.addEventListener('input', () => {
-        const content = input.value;
+        const content = input.innerHTML;
         if (shouldTriggerSave(content)) {
             updateContentFromChecklist(items);
             lastSavedContent = content; // Approximate
@@ -485,6 +496,11 @@ window.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     ipcRenderer.send('show-context-menu', {
         noteId,
-        fontSettings: noteData.fontSettings
+        fontSettings: noteData.fontSettings,
+        selectionState: {
+            bold: document.queryCommandState('bold'),
+            italic: document.queryCommandState('italic'),
+            underline: document.queryCommandState('underline')
+        }
     });
 });
