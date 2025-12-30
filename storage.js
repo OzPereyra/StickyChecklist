@@ -111,8 +111,7 @@ class StorageManager {
                 borderRadius: 12,
                 opacity: 100,
                 colorType: 'style-gradient',
-                scale: 1.0,
-                lengthMultiplier: 1 // 1, 2, or 3
+                scale: 1.0
             },
             fontSettings: {
                 family: "'Outfit', sans-serif",

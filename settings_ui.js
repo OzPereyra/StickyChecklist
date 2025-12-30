@@ -6,7 +6,6 @@ const opacitySlider = document.getElementById('opacity-slider');
 const opacityVal = document.getElementById('opacity-val');
 const radiusSlider = document.getElementById('radius-slider');
 const radiusVal = document.getElementById('radius-val');
-const lengthBtns = document.querySelectorAll('.length-btn');
 const styleBtns = document.querySelectorAll('.style-btn');
 const closeBtn = document.getElementById('close-btn');
 
@@ -30,7 +29,6 @@ function updateUI() {
     radiusSlider.value = appearance.borderRadius || 12;
     radiusVal.innerText = (appearance.borderRadius || 12) + 'px';
 
-    setActiveBtn(lengthBtns, appearance.lengthMultiplier || 1);
     setActiveBtn(styleBtns, appearance.colorType || 'style-gradient');
 }
 
@@ -61,14 +59,6 @@ radiusSlider.addEventListener('input', () => {
     currentSettings.appearance.borderRadius = parseInt(radiusSlider.value);
     radiusVal.innerText = currentSettings.appearance.borderRadius + 'px';
     notifyChange();
-});
-
-lengthBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        currentSettings.appearance.lengthMultiplier = parseInt(btn.dataset.val);
-        setActiveBtn(lengthBtns, currentSettings.appearance.lengthMultiplier);
-        notifyChange();
-    });
 });
 
 styleBtns.forEach(btn => {

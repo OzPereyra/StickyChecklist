@@ -9,7 +9,7 @@
         body {
             background: #fdfdfd;
             height: 100vh;
-            overflow-y: auto;
+            overflow: hidden;
             color: #333;
             padding: 15px;
             user-select: none;
@@ -31,7 +31,7 @@
 
         .settings-content {
             flex-grow: 1;
-            padding-bottom: 5px;
+            padding-bottom: 0px;
         }
 
         .settings-header h2 {
@@ -51,9 +51,9 @@
 
         .setting-group {
             background: white;
-            padding: 15px;
+            padding: 12px;
             border-radius: 12px;
-            margin-bottom: 20px;
+            margin-bottom: 12px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
         }
 
@@ -116,7 +116,8 @@
             font-size: 0.8rem;
             color: #999;
             text-align: center;
-            margin-top: 10px;
+            margin-top: 5px;
+            margin-bottom: 0;
         }
     </style>
 </head>
@@ -134,16 +135,6 @@
             <div class="range-container">
                 <input type="range" id="scale-slider" min="0.5" max="1.0" step="0.01" value="1.0">
                 <span class="value-badge" id="scale-val">1.0</span>
-            </div>
-        </div>
-
-        <!-- Height Setting -->
-        <div class="setting-group">
-            <label>Largo de la Sticky</label>
-            <div class="btn-toggle-group">
-                <button class="btn-toggle length-btn" data-val="1">Original</button>
-                <button class="btn-toggle length-btn" data-val="2">x2 Largo</button>
-                <button class="btn-toggle length-btn" data-val="3">x3 Largo</button>
             </div>
         </div>
 

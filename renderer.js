@@ -72,6 +72,9 @@ let noteData = {
     if (noteData.alwaysOnTop === undefined) noteData.alwaysOnTop = true;
 
     applyState();
+
+    // Notify Main that we are ready to be shown
+    ipcRenderer.send('note-ready', noteId);
 })();
 
 function applyState() {

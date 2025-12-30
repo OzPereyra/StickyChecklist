@@ -52,7 +52,7 @@ function createNoteWindow(noteId, options = {}) {
     const baseWidth = 320;
     const baseHeightBase = 350;
     const scale = finalAppearance.scale || 1.0;
-    const multiplier = finalAppearance.lengthMultiplier || 1;
+    const multiplier = noteData.appearance.lengthMultiplier || 1;
 
     const finalWidth = Math.round(baseWidth * scale);
     const finalHeight = Math.round(baseHeightBase * multiplier * scale);
@@ -68,6 +68,7 @@ function createNoteWindow(noteId, options = {}) {
         transparent: true,
         resizable: true,
         alwaysOnTop: noteData.alwaysOnTop,
+        show: false, // Don't show until renderer is ready
         skipTaskbar: false,
         webPreferences: {
             nodeIntegration: true,
@@ -76,6 +77,7 @@ function createNoteWindow(noteId, options = {}) {
         }
     });
 
+    win.noteId = noteId;
     win.loadFile('index.html');
 
     // Track window
@@ -102,6 +104,13 @@ function createNoteWindow(noteId, options = {}) {
         delete windows[noteId];
     });
 }
+
+// Global listener for showing ready notes
+ipcMain.on('note-ready', (event, noteId) => {
+    if (windows[noteId]) {
+        windows[noteId].show();
+    }
+});
 
 const gotTheLock = app.requestSingleInstanceLock();
 
@@ -354,6 +363,43 @@ ipcMain.on('show-settings-menu', (event, { noteId, fontSettings, currentColor, a
     });
     menu.append(new MenuItem({ label: 'Color', submenu: colorMenu }));
 
+    // --- LARGO INDIVIDUAL ---
+    const lengthSubmenu = new Menu();
+    [
+        { label: 'Original', value: 1 },
+        { label: 'x2 Largo', value: 2 },
+        { label: 'x3 Largo', value: 3 }
+    ].forEach(l => {
+        lengthSubmenu.append(new MenuItem({
+            label: l.label,
+            type: 'radio',
+            checked: parseInt(appearance.lengthMultiplier || 1) === l.value,
+            click: () => {
+                const newL = parseInt(l.value);
+                win.webContents.send('appearance-changed', { key: 'lengthMultiplier', value: newL });
+
+                // Update local copy so menu reflect change if reopened
+                appearance.lengthMultiplier = newL;
+
+                // Immediate resize
+                const globalScale = storage.getGlobalSettings().appearance.scale || 1.0;
+                const baseWidth = 320;
+                const baseHeightBase = 350;
+                const finalWidth = Math.round(baseWidth * globalScale);
+                const finalHeight = Math.round(baseHeightBase * newL * globalScale);
+
+                const b = win.getBounds();
+                win.setBounds({
+                    x: b.x,
+                    y: b.y,
+                    width: finalWidth,
+                    height: finalHeight
+                }, false);
+            }
+        }));
+    });
+    menu.append(new MenuItem({ label: 'Largo', submenu: lengthSubmenu }));
+
     menu.append(new MenuItem({
         label: 'Apariencia...',
         click: () => openAppearanceSettings()
@@ -445,12 +491,12 @@ function openAppearanceSettings() {
 
     appearanceWin = new BrowserWindow({
         width: 360,
-        height: 650,
+        height: 420,
         frame: false,
         transparent: true,
         resizable: false,
         minWidth: 280,
-        minHeight: 400,
+        minHeight: 300,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false
@@ -470,8 +516,7 @@ ipcMain.on('update-global-settings', (event, settings) => {
     storage.saveGlobalSettings(settings);
 
     // Identify if size-affecting settings changed
-    const sizeChanged = (oldSettings.appearance.scale !== settings.appearance.scale) ||
-        (oldSettings.appearance.lengthMultiplier !== settings.appearance.lengthMultiplier);
+    const sizeChanged = (oldSettings.appearance.scale !== settings.appearance.scale);
 
     // Broadcast to all windows
     Object.values(windows).forEach(win => {
@@ -480,20 +525,28 @@ ipcMain.on('update-global-settings', (event, settings) => {
         // Send the settings to update transparency/radius/style via CSS
         win.webContents.send('global-settings-changed', settings);
 
-        // ONLY update window size if the scale or length multiplier changed
+        // ONLY update window size if the scale changed
         if (sizeChanged) {
             const baseWidth = 320;
             const baseHeightBase = 350;
             const scale = settings.appearance.scale || 1.0;
-            const multiplier = settings.appearance.lengthMultiplier || 1;
+
+            // Get individual note multiplier
+            const noteData = storage.getAllNotes()[win.noteId] || { appearance: {} };
+            const multiplier = noteData.appearance.lengthMultiplier || 1;
 
             const finalWidth = Math.round(baseWidth * scale);
             const finalHeight = Math.round(baseHeightBase * multiplier * scale);
 
             const currentSize = win.getSize();
             if (currentSize[0] !== finalWidth || currentSize[1] !== finalHeight) {
-                // Use setSize to keep the top-left anchored without shifting the window
-                win.setSize(finalWidth, finalHeight);
+                const b = win.getBounds();
+                win.setBounds({
+                    x: b.x,
+                    y: b.y,
+                    width: finalWidth,
+                    height: finalHeight
+                }, false);
             }
         }
     });
