@@ -311,9 +311,13 @@ textarea {
     border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 }
 
+.checklist-item.completed {
+    opacity: 0.5;
+}
+
+.checklist-item.completed div[contenteditable],
 .checklist-item.completed input[type="text"] {
     text-decoration: line-through;
-    opacity: 0.6;
 }
 
 /* Themes */

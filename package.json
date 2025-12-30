@@ -1,6 +1,6 @@
 {
   "name": "sticky-checklist",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "main": "main.js",
   "scripts": {
     "start": "set ELECTRON_RUN_AS_NODE=&& electron .",
