@@ -71,11 +71,36 @@ let noteData = {
     if (!noteData.fontSettings) noteData.fontSettings = { family: "'Outfit', sans-serif", size: 16 };
     if (noteData.alwaysOnTop === undefined) noteData.alwaysOnTop = true;
 
+    // Load custom fonts
+    loadCustomFonts(globalSettings.customFonts || []);
+
     applyState();
 
     // Notify Main that we are ready to be shown
     ipcRenderer.send('note-ready', noteId);
 })();
+
+function loadCustomFonts(fonts) {
+    let styleTag = document.getElementById('custom-fonts-style');
+    if (!styleTag) {
+        styleTag = document.createElement('style');
+        styleTag.id = 'custom-fonts-style';
+        document.head.appendChild(styleTag);
+    }
+
+    const cssRules = fonts.map(f => {
+        // Clean path for URL and encode it
+        const safePath = f.path.replace(/\\/g, '/');
+        return `
+            @font-face {
+                font-family: '${f.name}';
+                src: url('sticky-font://${encodeURIComponent(safePath)}');
+            }
+        `;
+    }).join('\n');
+
+    styleTag.innerHTML = cssRules;
+}
 
 function applyState() {
     // Set Color
@@ -373,6 +398,11 @@ ipcRenderer.on('settings-changed', (event, { key, value }) => {
     } else {
         updateFontSettings(key, value);
     }
+});
+
+// Font update listener
+ipcRenderer.on('fonts-updated', (event, fonts) => {
+    loadCustomFonts(fonts);
 });
 
 ipcRenderer.on('appearance-changed', (event, { key, value }) => {

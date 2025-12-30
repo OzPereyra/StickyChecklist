@@ -23,6 +23,13 @@ class StorageManager {
         return this._getBaseDir();
     }
 
+    getFontsDir() {
+        const base = this._getBaseDir();
+        const fontsDir = path.join(base, 'fonts');
+        this.ensureDirectoryExists(fontsDir);
+        return fontsDir;
+    }
+
     ensureDirectoryExists(dirPath) {
         if (!fs.existsSync(dirPath)) {
             try {
@@ -116,7 +123,8 @@ class StorageManager {
             fontSettings: {
                 family: "'Outfit', sans-serif",
                 size: 16
-            }
+            },
+            customFonts: [] // Array of { name: string, path: string }
         };
 
         if (fs.existsSync(configPath)) {

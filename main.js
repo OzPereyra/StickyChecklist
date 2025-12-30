@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, screen, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, dialog, protocol, net } = require('electron');
+const fs = require('fs');
 const path = require('path');
 const storage = require('./storage.js');
 const crypto = require('crypto');
@@ -117,6 +118,27 @@ const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
     app.quit();
 } else {
+    app.whenReady().then(() => {
+        // Register custom protocol for fonts
+        protocol.handle('sticky-font', (request) => {
+            try {
+                const url = new URL(request.url);
+                const encodedPath = url.host + url.pathname;
+                const filePath = decodeURIComponent(encodedPath);
+
+                // net.fetch requires file:// protocol for local files
+                // We ensure it starts with / for Windows drives e.g. /C:/...
+                const normalizedPath = path.normalize(filePath).replace(/\\/g, '/');
+                const fileUrl = 'file:///' + normalizedPath.replace(/^\/+/, '');
+
+                return net.fetch(fileUrl);
+            } catch (error) {
+                console.error('Font protocol error:', error);
+                return new Response('Font not found', { status: 404 });
+            }
+        });
+    });
+
     app.on('second-instance', (event, commandLine, workingDirectory) => {
         const winIds = Object.keys(windows);
         if (winIds.length > 0) {
@@ -294,20 +316,95 @@ ipcMain.on('show-settings-menu', (event, { noteId, fontSettings, currentColor, a
 
     // Submenu: Tipo de Fuente
     const familyMenu = new Menu();
-    [
+    const globalSettings = storage.getGlobalSettings();
+
+    // Default fonts
+    const defaultFonts = [
         { label: 'Outfit', value: "'Outfit', sans-serif" },
         { label: 'Arial', value: "Arial, sans-serif" },
         { label: 'Courier New', value: "'Courier New', monospace" },
         { label: 'Times New Roman', value: "'Times New Roman', serif" },
         { label: 'Verdana', value: "Verdana, sans-serif" }
-    ].forEach(f => {
+    ];
+
+    // Helper to compare fonts without worrying about quotes or spaces
+    const normalizeFont = (f) => f ? f.replace(/['"]/g, '').replace(/\s+/g, ' ').trim().toLowerCase() : '';
+    const currentFamilyNormal = normalizeFont(fontSettings.family);
+
+    defaultFonts.forEach(f => {
+        const isSelected = currentFamilyNormal === normalizeFont(f.value);
         familyMenu.append(new MenuItem({
             label: f.label,
-            type: 'radio',
-            checked: fontSettings.family === f.value,
+            type: 'checkbox', // Use checkbox to avoid separate radio groups when using separators
+            checked: isSelected,
             click: () => win.webContents.send('settings-changed', { key: 'family', value: f.value })
         }));
     });
+
+    // Custom fonts
+    if (globalSettings.customFonts && globalSettings.customFonts.length > 0) {
+        familyMenu.append(new MenuItem({ type: 'separator' }));
+        globalSettings.customFonts.forEach(f => {
+            const fontValue = `'${f.name}', sans-serif`;
+            const isSelected = currentFamilyNormal === normalizeFont(fontValue);
+            familyMenu.append(new MenuItem({
+                label: f.name,
+                type: 'checkbox',
+                checked: isSelected,
+                click: () => win.webContents.send('settings-changed', { key: 'family', value: fontValue })
+            }));
+        });
+    }
+
+    familyMenu.append(new MenuItem({ type: 'separator' }));
+    familyMenu.append(new MenuItem({
+        label: 'Importar Fuente...',
+        click: async () => {
+            const result = await dialog.showOpenDialog(win, {
+                title: 'Seleccionar archivo de fuente',
+                filters: [{ name: 'Fuentes', extensions: ['ttf', 'otf', 'woff', 'woff2'] }],
+                properties: ['openFile']
+            });
+
+            if (!result.canceled && result.filePaths.length > 0) {
+                const srcPath = result.filePaths[0];
+                const fontName = path.parse(srcPath).name;
+                const destDir = storage.getFontsDir();
+                const destPath = path.join(destDir, path.basename(srcPath));
+
+                try {
+                    fs.copyFileSync(srcPath, destPath);
+
+                    // Add to global settings
+                    const currentGS = storage.getGlobalSettings();
+                    if (!currentGS.customFonts) currentGS.customFonts = [];
+
+                    // Avoid duplicates
+                    if (!currentGS.customFonts.find(f => f.name === fontName)) {
+                        currentGS.customFonts.push({ name: fontName, path: destPath });
+                        storage.saveGlobalSettings(currentGS);
+                    }
+
+                    // Apply automatically to this note
+                    const fontValue = `'${fontName}', sans-serif`;
+                    win.webContents.send('settings-changed', { key: 'family', value: fontValue });
+
+                    // Broadcast new fonts to all windows so they can load the @font-face
+                    Object.values(windows).forEach(w => {
+                        if (!w.isDestroyed()) w.webContents.send('fonts-updated', currentGS.customFonts);
+                    });
+
+                    dialog.showMessageBox(win, {
+                        type: 'info',
+                        message: `Fuente "${fontName}" importada y aplicada.`
+                    });
+                } catch (err) {
+                    dialog.showErrorBox('Error', 'No se pudo copiar el archivo de fuente.');
+                }
+            }
+        }
+    }));
+
     fontMainSubmenu.append(new MenuItem({ label: 'Tipo de Letra', submenu: familyMenu }));
 
     // Submenu: Tamaño
