@@ -1,29 +1,21 @@
-const { app, BrowserWindow, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, dialog } = require('electron');
 const path = require('path');
-const Store = require('./store.js');
+const storage = require('./storage.js');
 const crypto = require('crypto');
-
-// Initialize store
-const store = new Store({
-    configName: 'sticky-checklist-preferences',
-    defaults: {
-        notes: {} // Object structure: { [id]: { id, x, y, color, content, type (text/list) } }
-    }
-});
 
 let windows = {}; // Track open windows by ID
 
 function createNoteWindow(noteId, options = {}) {
     // Default config if new
     const defaults = {
-        width: 320, // Slightly wider for new toolbar
+        width: 320,
         height: 350,
         x: undefined,
         y: undefined,
         color: 'theme-yellow',
         content: '',
         title: 'Sticky Checklist',
-        type: 'text', // or 'checklist'
+        type: 'text',
         fontSettings: {
             family: "'Outfit', sans-serif",
             size: 16,
@@ -33,23 +25,23 @@ function createNoteWindow(noteId, options = {}) {
         }
     };
 
-    const noteData = store.get('notes')[noteId] || { ...defaults, id: noteId, ...options };
-    // Merge defaults if existing note is missing new fields
-    if (store.get('notes')[noteId]) {
+    const allNotes = storage.getAllNotes();
+    const noteData = allNotes[noteId] || { ...defaults, id: noteId, ...options };
+
+    // Merge defaults
+    if (allNotes[noteId]) {
         noteData.fontSettings = { ...defaults.fontSettings, ...(noteData.fontSettings || {}) };
         if (!noteData.title) noteData.title = defaults.title;
     }
 
     // Save initial state if it's new
-    if (!store.get('notes')[noteId]) {
-        const currentNotes = store.get('notes');
-        currentNotes[noteId] = noteData;
-        store.set('notes', currentNotes);
+    if (!allNotes[noteId]) {
+        storage.saveNote(noteData);
     }
 
     const win = new BrowserWindow({
-        width: 320,
-        height: 350,
+        width: noteData.width || 320,
+        height: noteData.height || 350,
         x: noteData.x,
         y: noteData.y,
         minWidth: 250,
@@ -58,6 +50,7 @@ function createNoteWindow(noteId, options = {}) {
         transparent: true,
         resizable: true,
         alwaysOnTop: true,
+        skipTaskbar: false,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
@@ -73,13 +66,13 @@ function createNoteWindow(noteId, options = {}) {
     // Save bounds on move/resize
     const saveBounds = () => {
         const bounds = win.getBounds();
-        const nodes = store.get('notes');
-        if (nodes[noteId]) {
-            nodes[noteId].x = bounds.x;
-            nodes[noteId].y = bounds.y;
-            nodes[noteId].width = bounds.width;
-            nodes[noteId].height = bounds.height;
-            store.set('notes', nodes);
+        const currentData = storage.getAllNotes()[noteId];
+        if (currentData) {
+            currentData.x = bounds.x;
+            currentData.y = bounds.y;
+            currentData.width = bounds.width;
+            currentData.height = bounds.height;
+            storage.saveNote(currentData);
         }
     };
 
@@ -92,30 +85,50 @@ function createNoteWindow(noteId, options = {}) {
     });
 }
 
-app.whenReady().then(() => {
-    const notes = store.get('notes');
-    const noteIds = Object.keys(notes);
+const gotTheLock = app.requestSingleInstanceLock();
 
-    if (noteIds.length === 0) {
-        // Create first default note
-        createNoteWindow(crypto.randomUUID());
-    } else {
-        // Restore all notes
-        noteIds.forEach(id => createNoteWindow(id));
-    }
-
-    app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0) {
-            const notes = store.get('notes');
-            if (Object.keys(notes).length === 0) {
-                createNoteWindow(crypto.randomUUID());
-            } else {
-                // Re-open them? Usually they stay open. 
-                // If app was closed and re-opened, "whenReady" handles it.
+if (!gotTheLock) {
+    app.quit();
+} else {
+    app.on('second-instance', (event, commandLine, workingDirectory) => {
+        // Someone tried to run a second instance, we should focus our windows.
+        // Maybe focus the last active one?
+        const winIds = Object.keys(windows);
+        if (winIds.length > 0) {
+            const win = windows[winIds[0]];
+            if (win) {
+                if (win.isMinimized()) win.restore();
+                win.focus();
             }
         }
     });
-});
+
+    app.whenReady().then(() => {
+        // Configuration for Startup
+        app.setLoginItemSettings({
+            openAtLogin: app.getLoginItemSettings().openAtLogin,
+            path: app.getPath('exe')
+        });
+
+        const notes = storage.getAllNotes();
+        const noteIds = Object.keys(notes);
+
+        if (noteIds.length === 0) {
+            createNoteWindow(crypto.randomUUID());
+        } else {
+            noteIds.forEach(id => createNoteWindow(id));
+        }
+
+        app.on('activate', () => {
+            if (BrowserWindow.getAllWindows().length === 0) {
+                const notes = storage.getAllNotes();
+                if (Object.keys(notes).length === 0) {
+                    createNoteWindow(crypto.randomUUID());
+                }
+            }
+        });
+    });
+}
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
@@ -125,9 +138,7 @@ app.on('window-all-closed', () => {
 
 // --- IPC Handlers ---
 
-// Create new note
 ipcMain.on('create-new-note', (event, fromNoteId) => {
-    // Offset the new note slightly from the creator
     let x, y;
     if (fromNoteId && windows[fromNoteId]) {
         const bounds = windows[fromNoteId].getBounds();
@@ -135,47 +146,165 @@ ipcMain.on('create-new-note', (event, fromNoteId) => {
         y = bounds.y + 30;
     }
 
-    // Get previous note's color to avoid repetition if possible
     const colors = ['theme-yellow', 'theme-blue', 'theme-pink', 'theme-green'];
     let availableColors = colors;
-
-    if (fromNoteId) {
-        const notes = store.get('notes');
-        if (notes[fromNoteId] && notes[fromNoteId].color) {
-            availableColors = colors.filter(c => c !== notes[fromNoteId].color);
-        }
-    }
-
     const randomColor = availableColors[Math.floor(Math.random() * availableColors.length)];
 
     createNoteWindow(crypto.randomUUID(), { x, y, color: randomColor });
 });
 
-// Close/Delete note
 ipcMain.on('delete-note', (event, noteId) => {
-    if (windows[noteId]) {
-        windows[noteId].close();
+    // Try to find window by ID, or fallback to event.sender
+    let win = windows[noteId];
+    if (!win) {
+        win = BrowserWindow.fromWebContents(event.sender);
     }
-    // Remove from store
-    const notes = store.get('notes');
-    delete notes[noteId];
-    store.set('notes', notes);
+
+    if (win) {
+        win.close();
+    }
+    // Ensure persistence removal
+    storage.deleteNote(noteId);
 });
 
-// Update note data (content, color, type, title, fontSettings)
-ipcMain.on('update-note-data', (event, { id, content, color, type, title, fontSettings }) => {
-    const notes = store.get('notes');
-    if (notes[id]) {
-        if (content !== undefined) notes[id].content = content;
-        if (color !== undefined) notes[id].color = color;
-        if (type !== undefined) notes[id].type = type;
-        if (title !== undefined) notes[id].title = title;
-        if (fontSettings !== undefined) notes[id].fontSettings = fontSettings;
-        store.set('notes', notes);
+ipcMain.on('update-note-data', (event, data) => {
+    const allNotes = storage.getAllNotes();
+    if (allNotes[data.id]) {
+        const updated = { ...allNotes[data.id], ...data };
+        storage.saveNote(updated);
     }
 });
 
-// Get note data (for initialization)
+ipcMain.on('show-settings-menu', (event, { noteId, fontSettings }) => {
+    const { Menu, MenuItem } = require('electron');
+    const win = windows[noteId] || BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+
+    const fontFamilies = [
+        { label: 'Outfit', value: "'Outfit', sans-serif" },
+        { label: 'Arial', value: "Arial, sans-serif" },
+        { label: 'Courier New', value: "'Courier New', monospace" },
+        { label: 'Times New Roman', value: "'Times New Roman', serif" },
+        { label: 'Verdana', value: "Verdana, sans-serif" }
+    ];
+
+    const fontSizes = [12, 14, 16, 18, 20, 24, 30];
+
+    const menu = new Menu();
+
+    // Fonts Submenu
+    const fontMenu = new Menu();
+    fontFamilies.forEach(f => {
+        fontMenu.append(new MenuItem({
+            label: f.label,
+            type: 'radio',
+            checked: fontSettings.family === f.value,
+            click: () => win.webContents.send('settings-changed', { key: 'family', value: f.value })
+        }));
+    });
+    menu.append(new MenuItem({ label: 'Fuente', submenu: fontMenu }));
+
+    // Size Submenu
+    const sizeMenu = new Menu();
+    fontSizes.forEach(size => {
+        sizeMenu.append(new MenuItem({
+            label: `${size}px`,
+            type: 'radio',
+            checked: parseInt(fontSettings.size) === size,
+            click: () => win.webContents.send('settings-changed', { key: 'size', value: size })
+        }));
+    });
+    menu.append(new MenuItem({ label: 'Tamaño', submenu: sizeMenu }));
+
+    menu.append(new MenuItem({ type: 'separator' }));
+
+    // Styles
+    menu.append(new MenuItem({
+        label: 'Negrita',
+        type: 'checkbox',
+        checked: fontSettings.bold,
+        click: (menuItem) => win.webContents.send('settings-changed', { key: 'bold', value: menuItem.checked })
+    }));
+    menu.append(new MenuItem({
+        label: 'Cursiva',
+        type: 'checkbox',
+        checked: fontSettings.italic,
+        click: (menuItem) => win.webContents.send('settings-changed', { key: 'italic', value: menuItem.checked })
+    }));
+    menu.append(new MenuItem({
+        label: 'Subrayado',
+        type: 'checkbox',
+        checked: fontSettings.underline,
+        click: (menuItem) => win.webContents.send('settings-changed', { key: 'underline', value: menuItem.checked })
+    }));
+
+    menu.append(new MenuItem({ type: 'separator' }));
+
+    // Advanced Submenu
+    const advancedMenu = new Menu();
+    advancedMenu.append(new MenuItem({
+        label: 'Cambiar Carpeta de Datos...',
+        click: async () => {
+            const result = await dialog.showOpenDialog(win, { properties: ['openDirectory'] });
+            if (!result.canceled && result.filePaths.length > 0) {
+                const newPath = result.filePaths[0];
+                if (storage.setDirectory(newPath)) {
+                    // Notify renderer to show alert
+                    win.webContents.send('storage-changed', newPath);
+                }
+            }
+        }
+    }));
+
+    // Startup Check
+    const openAtLogin = app.getLoginItemSettings().openAtLogin;
+    advancedMenu.append(new MenuItem({
+        label: 'Iniciar con Windows',
+        type: 'checkbox',
+        checked: openAtLogin,
+        click: (item) => {
+            app.setLoginItemSettings({
+                openAtLogin: item.checked,
+                path: app.getPath('exe')
+            });
+        }
+    }));
+
+    menu.append(new MenuItem({ label: 'Opciones Avanzadas', submenu: advancedMenu }));
+
+    menu.popup({ window: win });
+});
+
+// Get note data
 ipcMain.handle('get-note-data', (event, noteId) => {
-    return store.get('notes')[noteId];
+    return storage.getAllNotes()[noteId];
+});
+
+// --- Settings IPC ---
+
+ipcMain.handle('get-app-settings', () => {
+    return {
+        storagePath: storage.getDirectory(),
+        openAtLogin: app.getLoginItemSettings().openAtLogin
+    };
+});
+
+ipcMain.on('set-startup', (event, enable) => {
+    app.setLoginItemSettings({
+        openAtLogin: enable,
+        path: app.getPath('exe')
+    });
+});
+
+ipcMain.handle('select-storage-folder', async () => {
+    const result = await dialog.showOpenDialog({
+        properties: ['openDirectory']
+    });
+    if (!result.canceled && result.filePaths.length > 0) {
+        const newPath = result.filePaths[0];
+        if (storage.setDirectory(newPath)) {
+            return newPath;
+        }
+    }
+    return null;
 });

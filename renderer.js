@@ -1,6 +1,12 @@
 const { ipcRenderer, clipboard } = require('electron');
 
 const noteIdArg = process.argv.find(arg => arg.startsWith('--noteId='));
+// Advanced Inputs (Native Menu used)
+/*
+const pathDisplay = document.getElementById('path-display');
+const btnChangeFolder = document.getElementById('btn-change-folder');
+const chkStartup = document.getElementById('chk-startup');
+*/
 const noteId = noteIdArg ? noteIdArg.split('=')[1] : 'default';
 
 const colors = ['theme-yellow', 'theme-blue', 'theme-pink', 'theme-green'];
@@ -18,12 +24,14 @@ const btnPaste = document.getElementById('btn-paste');
 const btnSettings = document.getElementById('btn-settings');
 const settingsMenu = document.getElementById('settings-menu');
 
-// Settings Inputs
+// Settings Inputs (Native Menu used now)
+/* 
 const fontSelect = document.getElementById('font-family');
 const fontSizeInput = document.getElementById('font-size');
 const btnBold = document.getElementById('btn-bold');
 const btnItalic = document.getElementById('btn-italic');
 const btnUnderline = document.getElementById('btn-underline');
+*/
 
 
 let currentMode = 'text'; // 'text' or 'checklist'
@@ -43,12 +51,23 @@ let noteData = {
 
 // Initialize
 (async () => {
+    // Load Note Data
     const data = await ipcRenderer.invoke('get-note-data', noteId);
     if (data) {
         // Merge defaults if missing (just in case)
         noteData = { ...noteData, ...data };
         if (!noteData.fontSettings) noteData.fontSettings = { family: "'Outfit', sans-serif", size: 16 };
         applyState();
+    }
+
+    // Load App Settings
+    try {
+        const appSettings = await ipcRenderer.invoke('get-app-settings');
+        pathDisplay.innerText = appSettings.storagePath || '...';
+        pathDisplay.title = appSettings.storagePath;
+        chkStartup.checked = appSettings.openAtLogin;
+    } catch (e) {
+        console.log('Error loading settings', e);
     }
 })();
 
@@ -63,12 +82,12 @@ function applyState() {
     // Set Font Settings
     applyFontSettings();
 
-    // Set Settings Menu Values
-    fontSelect.value = noteData.fontSettings.family;
-    fontSizeInput.value = noteData.fontSettings.size;
-    if (noteData.fontSettings.bold) btnBold.classList.add('active');
-    if (noteData.fontSettings.italic) btnItalic.classList.add('active');
-    if (noteData.fontSettings.underline) btnUnderline.classList.add('active');
+    // Set Settings Menu Values (Native menu handles this via 'checked' prop when opening)
+    // fontSelect.value = noteData.fontSettings.family;
+    // fontSizeInput.value = noteData.fontSettings.size;
+    // if (noteData.fontSettings.bold) btnBold.classList.add('active');
+    // if (noteData.fontSettings.italic) btnItalic.classList.add('active');
+    // if (noteData.fontSettings.underline) btnUnderline.classList.add('active');
 
 
     // Set Content & Mode
@@ -315,44 +334,39 @@ btnPaste.addEventListener('click', () => {
     }
 });
 
-// Settings Toggle
+// Settings Toggle -> Now invokes Native Menu
 btnSettings.addEventListener('click', (e) => {
     e.stopPropagation();
-    settingsMenu.classList.toggle('hidden');
+    // Send current state to main to populate menu
+    ipcRenderer.send('show-settings-menu', {
+        noteId,
+        fontSettings: noteData.fontSettings
+    });
 });
 
-// Close settings if clicked outside
-document.addEventListener('click', (e) => {
-    if (!settingsMenu.contains(e.target) && e.target !== btnSettings) {
-        settingsMenu.classList.add('hidden');
-    }
+// Remove old HTML menu listener if exists (clean up logic)
+// Listen for updates from Native Menu
+ipcRenderer.on('settings-changed', (event, { key, value }) => {
+    updateFontSettings(key, value);
 });
 
-// Font Settings Listeners
+ipcRenderer.on('storage-changed', (event, newPath) => {
+    alert('Carpeta cambiada a: ' + newPath + '\nLos cambios se aplicarán en el próximo inicio o nota.');
+});
+
+
+// Font Settings Helper
 function updateFontSettings(key, value) {
     noteData.fontSettings[key] = value;
     applyFontSettings();
     save();
 }
 
-fontSelect.addEventListener('change', (e) => updateFontSettings('family', e.target.value));
-fontSizeInput.addEventListener('change', (e) => updateFontSettings('size', e.target.value));
-
-btnBold.addEventListener('click', () => {
-    noteData.fontSettings.bold = !noteData.fontSettings.bold;
-    btnBold.classList.toggle('active');
-    updateFontSettings('bold', noteData.fontSettings.bold);
-});
-btnItalic.addEventListener('click', () => {
-    noteData.fontSettings.italic = !noteData.fontSettings.italic;
-    btnItalic.classList.toggle('active');
-    updateFontSettings('italic', noteData.fontSettings.italic);
-});
-btnUnderline.addEventListener('click', () => {
-    noteData.fontSettings.underline = !noteData.fontSettings.underline;
-    btnUnderline.classList.toggle('active');
-    updateFontSettings('underline', noteData.fontSettings.underline);
-});
+// (Removed old HTML input listeners as they are replaced by native menu)
+// fontSelect... btnBold... etc. no longer needed for INPUT, but their VARIABLES might be missing if I deleted them from HTML.
+// I should remove the HTML elements from index.html first, then this code.
+// For now, these listeners will just fail silently or simply likely not fire since elements might be hidden/removed.
+// I will just remove the explicit listeners for the HTML elements.
 
 // Event Listeners (Existing)
 textarea.addEventListener('input', () => {
