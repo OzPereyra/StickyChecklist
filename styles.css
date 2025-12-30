@@ -94,7 +94,7 @@ html {
     font-weight: 500;
     font-size: 1.1rem;
     /* 1pt bigger than content usually approx 1.1rem vs 1rem */
-    color: #333;
+    color: var(--title-color, #333);
     width: 100%;
     text-overflow: ellipsis;
 }
@@ -271,22 +271,26 @@ textarea {
     --bg-color-flat: #FFF59D;
     --bg-color-light: #FFF9C4;
     --bg-color-dark: #FFF176;
+    --title-color: #2a2815;
 }
 
 .theme-blue {
     --bg-color-flat: #BBDEFB;
     --bg-color-light: #E3F2FD;
     --bg-color-dark: #90CAF9;
+    --title-color: #151a2a;
 }
 
 .theme-pink {
     --bg-color-flat: #F8BBD0;
     --bg-color-light: #FCE4EC;
     --bg-color-dark: #F48FB1;
+    --title-color: #2a151f;
 }
 
 .theme-green {
     --bg-color-flat: #C8E6C9;
     --bg-color-light: #E8F5E9;
     --bg-color-dark: #A5D6A7;
+    --title-color: #152a17;
 }
