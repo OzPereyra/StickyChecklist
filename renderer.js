@@ -50,7 +50,8 @@ let noteData = {
     },
     appearance: {
         borderRadius: 12,
-        opacity: 100
+        opacity: 100,
+        colorType: 'style-gradient'
     }
 };
 
@@ -58,20 +59,29 @@ let noteData = {
 (async () => {
     // Load Note Data
     const data = await ipcRenderer.invoke('get-note-data', noteId);
+    const globalSettings = await ipcRenderer.invoke('get-global-settings');
+
     if (data) {
-        // Merge defaults if missing (just in case)
         noteData = { ...noteData, ...data };
-        if (!noteData.fontSettings) noteData.fontSettings = { family: "'Outfit', sans-serif", size: 16 };
-        if (!noteData.appearance) noteData.appearance = { borderRadius: 12, opacity: 100 };
-        if (noteData.alwaysOnTop === undefined) noteData.alwaysOnTop = true;
-        applyState();
     }
+
+    // Always merge global appearance for sync
+    noteData.appearance = { ...globalSettings.appearance, ...(noteData.appearance || {}) };
+
+    if (!noteData.fontSettings) noteData.fontSettings = { family: "'Outfit', sans-serif", size: 16 };
+    if (noteData.alwaysOnTop === undefined) noteData.alwaysOnTop = true;
+
+    applyState();
 })();
 
 function applyState() {
     // Set Color
     noteContainer.classList.remove(...colors);
     noteContainer.classList.add(noteData.color);
+
+    // Set Style (Flat or Gradient)
+    noteContainer.classList.remove('style-flat', 'style-gradient');
+    noteContainer.classList.add(noteData.appearance.colorType || 'style-gradient');
 
     // Set Title
     noteTitleInput.value = noteData.title || 'Sticky Checklist';
@@ -99,6 +109,13 @@ function applyAppearance() {
     const a = noteData.appearance;
     noteContainer.style.borderRadius = (a.borderRadius || 12) + 'px';
     noteContainer.style.opacity = (a.opacity || 100) / 100;
+
+    // Apply Style Class
+    noteContainer.classList.remove('style-flat', 'style-gradient');
+    noteContainer.classList.add(a.colorType || 'style-gradient');
+
+    // Apply Zoom (Scale)
+    noteContainer.style.setProperty('--zoom', a.scale || 1.0);
 }
 
 function applyFontSettings() {
@@ -359,6 +376,11 @@ ipcRenderer.on('appearance-changed', (event, { key, value }) => {
     noteData.appearance[key] = value;
     applyAppearance();
     save();
+});
+
+ipcRenderer.on('global-settings-changed', (event, settings) => {
+    noteData.appearance = { ...noteData.appearance, ...settings.appearance };
+    applyAppearance();
 });
 
 ipcRenderer.on('color-changed', (event, newColor) => {

@@ -102,6 +102,45 @@ class StorageManager {
             }
         }
     }
+
+    getGlobalSettings() {
+        const base = this._getBaseDir();
+        const configPath = path.join(base, 'app_settings.json');
+        const defaults = {
+            appearance: {
+                borderRadius: 12,
+                opacity: 100,
+                colorType: 'style-gradient',
+                scale: 1.0,
+                lengthMultiplier: 1 // 1, 2, or 3
+            },
+            fontSettings: {
+                family: "'Outfit', sans-serif",
+                size: 16
+            }
+        };
+
+        if (fs.existsSync(configPath)) {
+            try {
+                const data = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+                return { ...defaults, ...data };
+            } catch (e) {
+                return defaults;
+            }
+        }
+        return defaults;
+    }
+
+    saveGlobalSettings(settings) {
+        const base = this._getBaseDir();
+        this.ensureDirectoryExists(base);
+        const configPath = path.join(base, 'app_settings.json');
+        try {
+            fs.writeFileSync(configPath, JSON.stringify(settings, null, 2), 'utf8');
+        } catch (err) {
+            console.error('Error saving global settings:', err);
+        }
+    }
 }
 
 module.exports = new StorageManager();

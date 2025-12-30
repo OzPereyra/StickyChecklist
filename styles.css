@@ -27,6 +27,16 @@ html {
     overflow: hidden;
     border: 1px solid rgba(0, 0, 0, 0.05);
     opacity: var(--opacity, 1);
+    transform: scale(var(--zoom, 1));
+    transform-origin: top left;
+}
+
+.note-container.style-flat {
+    background: var(--bg-color-flat, #fff7b9);
+}
+
+.note-container.style-gradient {
+    background: linear-gradient(135deg, var(--bg-color-light) 0%, var(--bg-color-dark) 100%);
 }
 
 /* Header Layout */
@@ -258,17 +268,25 @@ textarea {
 
 /* Themes */
 .theme-yellow {
-    background: linear-gradient(135deg, #FFF9C4 0%, #FFF176 100%);
+    --bg-color-flat: #FFF59D;
+    --bg-color-light: #FFF9C4;
+    --bg-color-dark: #FFF176;
 }
 
 .theme-blue {
-    background: linear-gradient(135deg, #E3F2FD 0%, #90CAF9 100%);
+    --bg-color-flat: #BBDEFB;
+    --bg-color-light: #E3F2FD;
+    --bg-color-dark: #90CAF9;
 }
 
 .theme-pink {
-    background: linear-gradient(135deg, #FCE4EC 0%, #F48FB1 100%);
+    --bg-color-flat: #F8BBD0;
+    --bg-color-light: #FCE4EC;
+    --bg-color-dark: #F48FB1;
 }
 
 .theme-green {
-    background: linear-gradient(135deg, #E8F5E9 0%, #A5D6A7 100%);
+    --bg-color-flat: #C8E6C9;
+    --bg-color-light: #E8F5E9;
+    --bg-color-dark: #A5D6A7;
 }

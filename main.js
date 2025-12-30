@@ -25,10 +25,7 @@ function createNoteWindow(noteId, options = {}) {
             italic: false,
             underline: false
         },
-        appearance: {
-            borderRadius: 12,
-            opacity: 100
-        }
+        appearance: storage.getGlobalSettings().appearance
     };
 
     const allNotes = storage.getAllNotes();
@@ -48,13 +45,25 @@ function createNoteWindow(noteId, options = {}) {
     // Save state
     storage.saveNote(noteData);
 
+    const globalSettings = storage.getGlobalSettings();
+    const finalAppearance = { ...globalSettings.appearance, ...noteData.appearance };
+
+    // Calculate final size based on scale and length
+    const baseWidth = 320;
+    const baseHeightBase = 350;
+    const scale = finalAppearance.scale || 1.0;
+    const multiplier = finalAppearance.lengthMultiplier || 1;
+
+    const finalWidth = Math.round(baseWidth * scale);
+    const finalHeight = Math.round(baseHeightBase * multiplier * scale);
+
     const win = new BrowserWindow({
-        width: noteData.width || 320,
-        height: noteData.height || 350,
+        width: finalWidth,
+        height: finalHeight,
         x: noteData.x,
         y: noteData.y,
-        minWidth: 250,
-        minHeight: 200,
+        minWidth: 100,
+        minHeight: 100,
         frame: false,
         transparent: true,
         resizable: true,
@@ -345,40 +354,10 @@ ipcMain.on('show-settings-menu', (event, { noteId, fontSettings, currentColor, a
     });
     menu.append(new MenuItem({ label: 'Color', submenu: colorMenu }));
 
-    // --- APARIENCIA SUBMENU ---
-    const appearMenu = new Menu();
-
-    // Bordes
-    const radiusMenu = new Menu();
-    [
-        { label: 'Cuadrado', value: 0 },
-        { label: 'Suave', value: 8 },
-        { label: 'Redondeado', value: 16 },
-        { label: 'Muy Redondeado', value: 24 },
-        { label: 'Cápsula', value: 40 }
-    ].forEach(r => {
-        radiusMenu.append(new MenuItem({
-            label: r.label,
-            type: 'radio',
-            checked: appearance.borderRadius === r.value,
-            click: () => win.webContents.send('appearance-changed', { key: 'borderRadius', value: r.value })
-        }));
-    });
-    appearMenu.append(new MenuItem({ label: 'Redondeado de Bordes', submenu: radiusMenu }));
-
-    // Opacidad
-    const opacityMenu = new Menu();
-    [100, 95, 90, 80, 70, 60].forEach(o => {
-        opacityMenu.append(new MenuItem({
-            label: `${o}%`,
-            type: 'radio',
-            checked: appearance.opacity === o,
-            click: () => win.webContents.send('appearance-changed', { key: 'opacity', value: o })
-        }));
-    });
-    appearMenu.append(new MenuItem({ label: 'Opacidad', submenu: opacityMenu }));
-
-    menu.append(new MenuItem({ label: 'Apariencia', submenu: appearMenu }));
+    menu.append(new MenuItem({
+        label: 'Apariencia...',
+        click: () => openAppearanceSettings()
+    }));
 
     menu.append(new MenuItem({ type: 'separator' }));
 
@@ -454,3 +433,71 @@ ipcMain.on('set-startup', (event, enable) => {
         path: app.getPath('exe')
     });
 });
+
+// --- Appearance Window ---
+let appearanceWin = null;
+
+function openAppearanceSettings() {
+    if (appearanceWin) {
+        appearanceWin.focus();
+        return;
+    }
+
+    appearanceWin = new BrowserWindow({
+        width: 360,
+        height: 650,
+        frame: false,
+        transparent: true,
+        resizable: false,
+        minWidth: 280,
+        minHeight: 400,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false
+        }
+    });
+
+    appearanceWin.loadFile('appearance_settings.html');
+    appearanceWin.on('closed', () => appearanceWin = null);
+}
+
+ipcMain.handle('get-global-settings', () => {
+    return storage.getGlobalSettings();
+});
+
+ipcMain.on('update-global-settings', (event, settings) => {
+    storage.saveGlobalSettings(settings);
+
+    // Broadcast to all windows
+    Object.values(windows).forEach(win => {
+        if (win.isDestroyed()) return;
+        win.webContents.send('global-settings-changed', settings);
+
+        // Calculate new size
+        const baseWidth = 320;
+        const baseHeightBase = 350;
+        const scale = settings.appearance.scale || 1.0;
+        const multiplier = settings.appearance.lengthMultiplier || 1;
+
+        const finalWidth = Math.round(baseWidth * scale);
+        const finalHeight = Math.round(baseHeightBase * multiplier * scale);
+
+        const currentSize = win.getSize();
+        // Only update bounds if size actually changed to prevent jumping/jitter
+        if (currentSize[0] !== finalWidth || currentSize[1] !== finalHeight) {
+            const bounds = win.getBounds();
+            win.setBounds({
+                x: bounds.x,
+                y: bounds.y,
+                width: finalWidth,
+                height: finalHeight
+            }, false);
+        }
+    });
+});
+
+ipcMain.on('close-appearance-settings', () => {
+    if (appearanceWin) appearanceWin.close();
+});
+
+
